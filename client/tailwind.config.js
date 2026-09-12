@@ -43,6 +43,8 @@ export default {
         sans: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
         serif: ['"Playfair Display"', 'Georgia', 'serif'],
         mono: ['"JetBrains Mono"', 'monospace'],
+        script: ['"Reenie Beanie"', '"Caveat"', '"Alex Brush"', '"Dancing Script"', 'cursive'],
+        signature: ['"Reenie Beanie"', '"Caveat"', '"Alex Brush"', 'cursive'],
       },
       boxShadow: {
         'gold-glow': '0 0 25px -5px rgba(213, 163, 86, 0.25)',

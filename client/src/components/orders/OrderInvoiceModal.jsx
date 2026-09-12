@@ -31,11 +31,11 @@ export const OrderInvoiceModal = ({ order, onClose }) => {
   });
 
   const orderNumberDisplay = `#ORD-${
-    (order.billNumber || '').replace(/[^0-9]/g, '').padStart(6, '0') || '000123'
+    (order.billNumber || '').replace(/[^0-9]/g, '').padStart(6, '0') || '000001'
   }`;
 
   const invoiceNumberDisplay = `#LC-${
-    (order.billNumber || '').replace(/[^0-9]/g, '').padStart(6, '0') || '000123'
+    (order.billNumber || '').replace(/[^0-9]/g, '').padStart(6, '0') || '000001'
   }`;
 
   // 1. Generate text receipt for WhatsApp / Copy
@@ -288,25 +288,25 @@ ${itemsText}
             </svg>
           </div>
 
-          <div className="relative z-10 flex flex-col justify-between min-h-[600px] space-y-6">
+          <div className="relative z-10 flex flex-col justify-between min-h-[580px] space-y-6">
             {/* Header: Brand Left & Slogan Right */}
             <div className="flex items-start justify-between gap-3">
               {/* Brand Logo & Taglines */}
-              <div>
+              <div className="min-w-0">
                 <h1 className="text-3xl sm:text-4xl font-extrabold tracking-[0.22em] text-black font-serif uppercase leading-none">
                   LUFO<span className="text-[14px] sm:text-lg align-top font-sans font-normal ml-0.5">™</span>
                 </h1>
-                <p className="text-[10px] sm:text-[11px] font-bold tracking-[0.45em] text-slate-900 uppercase mt-1.5 pl-0.5">
+                <p className="text-[10px] sm:text-[11px] font-bold tracking-[0.42em] text-slate-900 uppercase mt-1.5 pl-0.5 whitespace-nowrap">
                   C L O T H I N G
                 </p>
-                <p className="text-[8px] sm:text-[9px] font-medium tracking-[0.38em] text-slate-500 uppercase mt-1 pl-0.5">
-                  W E A R &nbsp; Y O U R &nbsp; S T O R Y
+                <p className="text-[8px] sm:text-[9px] font-semibold tracking-[0.25em] text-slate-500 uppercase mt-1 pl-0.5 whitespace-nowrap">
+                  WEAR YOUR STORY
                 </p>
               </div>
 
               {/* Slogan with Left Vertical Bar */}
               <div className="border-l-2 border-slate-900 pl-2.5 sm:pl-3 py-0.5 text-right self-start shrink-0">
-                <p className="text-[8px] sm:text-[9.5px] font-bold tracking-[0.16em] text-slate-900 leading-[1.3] uppercase">
+                <p className="text-[8px] sm:text-[9.5px] font-bold tracking-[0.16em] text-slate-900 leading-[1.3] uppercase whitespace-nowrap">
                   BETTER<br />STYLES.<br />BRIGHTER<br />DAYS.
                 </p>
               </div>
@@ -366,7 +366,7 @@ ${itemsText}
               <p className="text-slate-600 font-medium">India</p>
             </div>
 
-            {/* Items Table Header & Rows (Clean Grid fitting mobile width 100%) */}
+            {/* Items Table Header & Rows */}
             <div className="space-y-2.5 pt-1">
               {/* Header Pill */}
               <div className="bg-[#E7E2D8] rounded-xl px-3 sm:px-4 py-2 text-[9px] sm:text-[10.5px] font-bold uppercase tracking-wider text-slate-700 grid grid-cols-12 gap-1 items-center">
@@ -395,7 +395,7 @@ ${itemsText}
                         {item.name}
                       </div>
                       <div className="text-[10px] sm:text-[11px] text-slate-500 font-normal mt-0.5">
-                        Size: {item.size || 'L'} {item.color ? ` |  Color: ${item.color}` : ''}
+                        Size: {item.size || 'M'} {item.color ? ` | Color: ${item.color}` : ''}
                       </div>
                     </div>
 
@@ -419,19 +419,19 @@ ${itemsText}
             </div>
 
             {/* Bottom Section: Thank You on Left, Subtotal/Total on Right */}
-            <div className="flex flex-col-reverse sm:flex-row items-start sm:items-end justify-between gap-6 pt-2">
-              {/* Left: Cursive Thank You Note */}
-              <div className="pt-2">
+            <div className="flex flex-col-reverse sm:flex-row items-start sm:items-end justify-between gap-6 pt-3">
+              {/* Left: Cursive Thank You Note with no wrapping / overlap */}
+              <div className="pt-1 pb-1">
                 <div
-                  className="text-3xl sm:text-4xl text-slate-900 font-bold -rotate-2 select-none tracking-normal"
-                  style={{ fontFamily: "'Caveat', cursive, sans-serif" }}
+                  className="text-4xl sm:text-5xl text-slate-900 font-bold -rotate-3 select-none tracking-normal whitespace-nowrap mb-2 leading-tight"
+                  style={{ fontFamily: "'Reenie Beanie', 'Caveat', 'Alex Brush', 'Dancing Script', cursive" }}
                 >
                   Thank You!
                 </div>
-                <p className="text-[11px] sm:text-xs text-slate-700 font-medium mt-1">
+                <p className="text-[11px] sm:text-xs text-slate-700 font-medium whitespace-nowrap">
                   For being a part of LUFO.
                 </p>
-                <p className="text-[11px] sm:text-xs text-slate-700 font-medium">
+                <p className="text-[11px] sm:text-xs text-slate-700 font-medium whitespace-nowrap">
                   Your support means a lot to us!
                 </p>
               </div>
@@ -463,7 +463,7 @@ ${itemsText}
             <div className="pt-4 border-t border-slate-300/80">
               <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] sm:text-[11px] text-slate-700 font-medium">
                 {/* Website */}
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 whitespace-nowrap">
                   <Globe className="w-3.5 h-3.5 text-slate-600" />
                   <span>www.lufoclothing.com</span>
                 </div>
@@ -471,7 +471,7 @@ ${itemsText}
                 <span className="hidden sm:inline text-slate-300">|</span>
 
                 {/* Instagram (Requested: lufo_clothing_trichy) */}
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 whitespace-nowrap">
                   <Instagram className="w-3.5 h-3.5 text-slate-600" />
                   <span>@lufo_clothing_trichy</span>
                 </div>
@@ -479,27 +479,27 @@ ${itemsText}
                 <span className="hidden sm:inline text-slate-300">|</span>
 
                 {/* Email (Requested: lufoclothingofficial@gmail.com) */}
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 whitespace-nowrap">
                   <Mail className="w-3.5 h-3.5 text-slate-600" />
                   <span>lufoclothingofficial@gmail.com</span>
                 </div>
               </div>
 
               {/* Bottom Branding & Signature */}
-              <div className="flex items-end justify-between pt-5 mt-3">
+              <div className="flex items-end justify-between pt-4 mt-2">
                 <div>
-                  <div className="text-[11px] sm:text-xs font-extrabold tracking-[0.22em] text-slate-900 uppercase font-serif">
+                  <div className="text-[11px] sm:text-xs font-extrabold tracking-[0.22em] text-slate-900 uppercase font-serif whitespace-nowrap">
                     LUFO CLOTHING
                   </div>
-                  <div className="text-[8px] sm:text-[9px] font-bold tracking-[0.28em] text-slate-500 uppercase mt-0.5">
+                  <div className="text-[8px] sm:text-[9px] font-bold tracking-[0.28em] text-slate-500 uppercase mt-0.5 whitespace-nowrap">
                     STYLE &nbsp;/&nbsp; COMFORT &nbsp;/&nbsp; YOU
                   </div>
                 </div>
 
                 {/* LUFO Signature on bottom right */}
                 <div
-                  className="text-2xl sm:text-3xl font-bold text-slate-800 -rotate-6 select-none leading-none pr-1"
-                  style={{ fontFamily: "'Caveat', cursive, sans-serif" }}
+                  className="text-3xl sm:text-4xl font-bold text-slate-800 -rotate-6 select-none leading-none pr-1"
+                  style={{ fontFamily: "'Reenie Beanie', 'Caveat', 'Alex Brush', 'Dancing Script', cursive" }}
                 >
                   Lufo<span className="text-[10px] font-sans font-normal align-top ml-0.5">™</span>
                 </div>

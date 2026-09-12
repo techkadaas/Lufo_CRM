@@ -1,0 +1,17 @@
+{
+  "name": "lufo-crm",
+  "version": "1.0.0",
+  "description": "Atelier-grade Luxury CRM for LUFO Clothing",
+  "private": true,
+  "scripts": {
+    "dev:server": "cd server && npm start",
+    "dev:client": "cd client && npm run dev",
+    "server": "cd server && npm start",
+    "client": "cd client && npm run dev",
+    "build": "cd client && npm run build",
+    "install:all": "cd server && npm install && cd ../client && npm install"
+  },
+  "keywords": ["crm", "clothing", "fashion", "react", "node", "express", "mongodb", "tailwind"],
+  "author": "LUFO Clothing Atelier",
+  "license": "ISC"
+}

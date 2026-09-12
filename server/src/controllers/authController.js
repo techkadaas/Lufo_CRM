@@ -1,5 +1,5 @@
 import jwt from 'jsonwebtoken';
-import { User } from '../models/User.js';
+import { Store } from '../services/storeService.js';
 
 // Helper to generate JWT token
 const generateToken = (id) => {
@@ -25,7 +25,7 @@ export const login = async (req, res) => {
     }
 
     const cleanUsername = username.trim().toLowerCase();
-    const user = await User.findOne({ username: cleanUsername });
+    const user = await Store.getUserByUsername(cleanUsername);
 
     if (!user) {
       return res.status(401).json({
@@ -41,7 +41,7 @@ export const login = async (req, res) => {
       });
     }
 
-    const isMatch = await user.comparePassword(password);
+    const isMatch = await Store.comparePassword(user, password);
     if (!isMatch) {
       return res.status(401).json({
         success: false,
@@ -71,7 +71,7 @@ export const login = async (req, res) => {
 // @access  Private
 export const getMe = async (req, res) => {
   try {
-    const user = await User.findById(req.user._id).select('-password');
+    const user = await Store.getUserById(req.user._id);
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
@@ -86,29 +86,30 @@ export const getMe = async (req, res) => {
 // @access  Private
 export const updateMe = async (req, res) => {
   try {
-    const user = await User.findById(req.user._id);
+    const user = await Store.getUserByIdWithPassword(req.user._id);
 
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
 
     const { name, username, currentPassword, newPassword } = req.body;
+    const updateData = {};
 
     // If updating username, check uniqueness
-    if (username && username.trim().toLowerCase() !== user.username) {
+    if (username && username.trim().toLowerCase() !== user.username.toLowerCase()) {
       const cleanNewUsername = username.trim().toLowerCase();
-      const existing = await User.findOne({ username: cleanNewUsername });
+      const existing = await Store.getUserByUsername(cleanNewUsername);
       if (existing && existing._id.toString() !== user._id.toString()) {
         return res.status(400).json({
           success: false,
           message: 'Username is already taken. Please choose another.',
         });
       }
-      user.username = cleanNewUsername;
+      updateData.username = cleanNewUsername;
     }
 
     if (name) {
-      user.name = name.trim();
+      updateData.name = name.trim();
     }
 
     // If changing password
@@ -122,7 +123,7 @@ export const updateMe = async (req, res) => {
 
       // If current password is provided, verify it
       if (currentPassword) {
-        const isMatch = await user.comparePassword(currentPassword);
+        const isMatch = await Store.comparePassword(user, currentPassword);
         if (!isMatch) {
           return res.status(400).json({
             success: false,
@@ -130,20 +131,20 @@ export const updateMe = async (req, res) => {
           });
         }
       }
-      user.password = newPassword;
+      updateData.password = newPassword;
     }
 
-    await user.save();
+    const updatedUser = await Store.updateUser(user._id, updateData);
 
     res.json({
       success: true,
       message: 'Account updated successfully',
-      token: generateToken(user._id),
+      token: generateToken(updatedUser._id),
       user: {
-        _id: user._id,
-        name: user.name,
-        username: user.username,
-        role: user.role,
+        _id: updatedUser._id,
+        name: updatedUser.name,
+        username: updatedUser.username,
+        role: updatedUser.role,
       },
     });
   } catch (error) {
@@ -157,7 +158,7 @@ export const updateMe = async (req, res) => {
 // @access  Private/Admin
 export const getUsers = async (req, res) => {
   try {
-    const users = await User.find({}).select('-password').sort({ role: 1, createdAt: -1 });
+    const users = await Store.getUsers();
     const staffCount = users.filter((u) => u.role === 'staff').length;
 
     res.json({
@@ -199,7 +200,7 @@ export const createUser = async (req, res) => {
     const cleanUsername = username.trim().toLowerCase();
 
     // Check username uniqueness
-    const existing = await User.findOne({ username: cleanUsername });
+    const existing = await Store.getUserByUsername(cleanUsername);
     if (existing) {
       return res.status(400).json({
         success: false,
@@ -209,7 +210,7 @@ export const createUser = async (req, res) => {
 
     // Check limit on staff accounts (Max 3)
     if (role === 'staff') {
-      const currentStaffCount = await User.countDocuments({ role: 'staff' });
+      const currentStaffCount = await Store.countStaffUsers();
       if (currentStaffCount >= MAX_STAFF_ACCOUNTS) {
         return res.status(400).json({
           success: false,
@@ -218,7 +219,7 @@ export const createUser = async (req, res) => {
       }
     }
 
-    const newUser = await User.create({
+    const newUser = await Store.createUser({
       username: cleanUsername,
       password,
       name: name.trim(),
@@ -226,13 +227,10 @@ export const createUser = async (req, res) => {
       isActive: true,
     });
 
-    const userResponse = newUser.toObject();
-    delete userResponse.password;
-
     res.status(201).json({
       success: true,
       message: 'Account created successfully',
-      user: userResponse,
+      user: newUser,
     });
   } catch (error) {
     console.error('Create user error:', error);
@@ -248,34 +246,33 @@ export const updateUser = async (req, res) => {
     const { id } = req.params;
     const { name, username, password, isActive, role } = req.body;
 
-    const user = await User.findById(id);
+    const user = await Store.getUserById(id);
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
 
-    if (username && username.trim().toLowerCase() !== user.username) {
+    const updateData = {};
+
+    if (username && username.trim().toLowerCase() !== user.username.toLowerCase()) {
       const cleanUsername = username.trim().toLowerCase();
-      const existing = await User.findOne({ username: cleanUsername });
+      const existing = await Store.getUserByUsername(cleanUsername);
       if (existing && existing._id.toString() !== id) {
         return res.status(400).json({
           success: false,
           message: 'Username is already in use',
         });
       }
-      user.username = cleanUsername;
+      updateData.username = cleanUsername;
     }
 
-    if (name) user.name = name.trim();
-    if (typeof isActive === 'boolean') user.isActive = isActive;
-    if (role && ['admin', 'staff'].includes(role)) user.role = role;
+    if (name) updateData.name = name.trim();
+    if (typeof isActive === 'boolean') updateData.isActive = isActive;
+    if (role && ['admin', 'staff'].includes(role)) updateData.role = role;
     if (password && password.trim().length >= 6) {
-      user.password = password.trim();
+      updateData.password = password.trim();
     }
 
-    await user.save();
-
-    const userResponse = user.toObject();
-    delete userResponse.password;
+    const userResponse = await Store.updateUser(id, updateData);
 
     res.json({
       success: true,
@@ -301,12 +298,12 @@ export const deleteUser = async (req, res) => {
       });
     }
 
-    const user = await User.findById(id);
+    const user = await Store.getUserById(id);
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
 
-    await User.findByIdAndDelete(id);
+    await Store.deleteUser(id);
 
     res.json({
       success: true,

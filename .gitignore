@@ -33,3 +33,6 @@ Thumbs.db
 *.njsproj
 *.sln
 *.sw?
+
+# Local Store Data
+server/src/store/*.json

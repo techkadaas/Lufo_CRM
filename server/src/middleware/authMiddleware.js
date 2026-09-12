@@ -1,5 +1,5 @@
 import jwt from 'jsonwebtoken';
-import { User } from '../models/User.js';
+import { Store } from '../services/storeService.js';
 
 export const protect = async (req, res, next) => {
   let token;
@@ -8,7 +8,7 @@ export const protect = async (req, res, next) => {
     try {
       token = req.headers.authorization.split(' ')[1];
       const decoded = jwt.verify(token, process.env.JWT_SECRET || 'lufo_clothing_crm_secret_key_2026_super_secure_token');
-      req.user = await User.findById(decoded.id).select('-password');
+      req.user = await Store.getUserById(decoded.id);
 
       if (!req.user) {
         return res.status(401).json({ success: false, message: 'User not found or deleted' });

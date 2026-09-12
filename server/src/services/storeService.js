@@ -1,9 +1,67 @@
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import bcrypt from 'bcryptjs';
 import { Stock } from '../models/Stock.js';
 import { Order } from '../models/Order.js';
 import { Expense } from '../models/Expense.js';
+import { User } from '../models/User.js';
 import { getDBStatus } from '../config/db.js';
 import { initialStockData, initialExpenseData, initialOrderData } from '../utils/seeder.js';
 import { getDateRange } from '../utils/dateHelper.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const STORE_DIR = path.join(__dirname, '..', 'store');
+const USERS_FILE = path.join(STORE_DIR, 'users_store.json');
+
+// Ensure store directory exists
+if (!fs.existsSync(STORE_DIR)) {
+  try {
+    fs.mkdirSync(STORE_DIR, { recursive: true });
+  } catch (e) {}
+}
+
+// Load or initialize fallback users
+const loadFallbackUsers = () => {
+  try {
+    if (fs.existsSync(USERS_FILE)) {
+      const data = fs.readFileSync(USERS_FILE, 'utf8');
+      return JSON.parse(data);
+    }
+  } catch (err) {
+    console.warn('Error reading fallback users file:', err.message);
+  }
+
+  // Default initial admin
+  const salt = bcrypt.genSaltSync(10);
+  const defaultAdmin = {
+    _id: 'user_admin_master',
+    name: 'Ahamed (Admin)',
+    username: 'ahamed@lufoclothing',
+    password: bcrypt.hashSync('ahamed@lufo0987', salt),
+    role: 'admin',
+    isActive: true,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+
+  try {
+    fs.writeFileSync(USERS_FILE, JSON.stringify([defaultAdmin], null, 2), 'utf8');
+  } catch (e) {}
+
+  return [defaultAdmin];
+};
+
+let memUsers = loadFallbackUsers();
+
+const saveFallbackUsers = () => {
+  try {
+    fs.writeFileSync(USERS_FILE, JSON.stringify(memUsers, null, 2), 'utf8');
+  } catch (err) {
+    console.warn('Error saving fallback users:', err.message);
+  }
+};
 
 // In-memory fallback dataset
 let memStocks = initialStockData.map((item, idx) => ({
@@ -26,6 +84,7 @@ let memOrders = initialOrderData.map((item, idx) => ({
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
 }));
+
 
 export const Store = {
   // STOCKS
@@ -483,4 +542,179 @@ export const Store = {
       activeFilter: dateRange ? dateRange.label : 'All Time',
     };
   },
+
+  // USERS & AUTH
+  async getUserByUsername(username) {
+    const cleanUsername = (username || '').trim().toLowerCase();
+    if (getDBStatus()) {
+      try {
+        const user = await User.findOne({ username: cleanUsername });
+        if (user) return user;
+      } catch (e) {
+        console.warn('DB getUserByUsername fallback:', e.message);
+      }
+    }
+    return memUsers.find((u) => u.username.toLowerCase() === cleanUsername) || null;
+  },
+
+  async getUserById(id) {
+    if (getDBStatus()) {
+      try {
+        const user = await User.findById(id).select('-password');
+        if (user) return user;
+      } catch (e) {
+        console.warn('DB getUserById fallback:', e.message);
+      }
+    }
+    const mem = memUsers.find((u) => u._id.toString() === id.toString());
+    if (mem) {
+      const { password, ...safeUser } = mem;
+      return safeUser;
+    }
+    return null;
+  },
+
+  async getUserByIdWithPassword(id) {
+    if (getDBStatus()) {
+      try {
+        const user = await User.findById(id);
+        if (user) return user;
+      } catch (e) {
+        console.warn('DB getUserByIdWithPassword fallback:', e.message);
+      }
+    }
+    return memUsers.find((u) => u._id.toString() === id.toString()) || null;
+  },
+
+  async getUsers() {
+    if (getDBStatus()) {
+      try {
+        const users = await User.find({}).select('-password').sort({ role: 1, createdAt: -1 });
+        if (users && users.length > 0) return users;
+      } catch (e) {
+        console.warn('DB getUsers fallback:', e.message);
+      }
+    }
+    return memUsers.map(({ password, ...u }) => u);
+  },
+
+  async countStaffUsers() {
+    if (getDBStatus()) {
+      try {
+        return await User.countDocuments({ role: 'staff' });
+      } catch (e) {
+        console.warn('DB countStaffUsers fallback:', e.message);
+      }
+    }
+    return memUsers.filter((u) => u.role === 'staff').length;
+  },
+
+  async createUser(data) {
+    const cleanUsername = data.username.trim().toLowerCase();
+    let createdUser = null;
+
+    if (getDBStatus()) {
+      try {
+        const newUser = await User.create({
+          ...data,
+          username: cleanUsername,
+        });
+        createdUser = newUser.toObject();
+        delete createdUser.password;
+      } catch (e) {
+        console.warn('DB createUser fallback:', e.message);
+      }
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(data.password, salt);
+    const fallbackUser = {
+      _id: createdUser ? createdUser._id.toString() : `user_${Date.now()}`,
+      name: data.name.trim(),
+      username: cleanUsername,
+      password: hashedPassword,
+      role: data.role === 'admin' ? 'admin' : 'staff',
+      isActive: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    memUsers.push(fallbackUser);
+    saveFallbackUsers();
+
+    if (createdUser) return createdUser;
+    const { password, ...safe } = fallbackUser;
+    return safe;
+  },
+
+  async updateUser(id, data) {
+    let updatedSafe = null;
+
+    if (getDBStatus()) {
+      try {
+        const user = await User.findById(id);
+        if (user) {
+          if (data.name) user.name = data.name.trim();
+          if (data.username) user.username = data.username.trim().toLowerCase();
+          if (data.password) user.password = data.password;
+          if (typeof data.isActive === 'boolean') user.isActive = data.isActive;
+          if (data.role) user.role = data.role;
+          await user.save();
+          updatedSafe = user.toObject();
+          delete updatedSafe.password;
+        }
+      } catch (e) {
+        console.warn('DB updateUser fallback:', e.message);
+      }
+    }
+
+    const idx = memUsers.findIndex((u) => u._id.toString() === id.toString());
+    if (idx !== -1) {
+      if (data.name) memUsers[idx].name = data.name.trim();
+      if (data.username) memUsers[idx].username = data.username.trim().toLowerCase();
+      if (typeof data.isActive === 'boolean') memUsers[idx].isActive = data.isActive;
+      if (data.role) memUsers[idx].role = data.role;
+      if (data.password) {
+        const salt = await bcrypt.genSalt(10);
+        memUsers[idx].password = await bcrypt.hash(data.password, salt);
+      }
+      memUsers[idx].updatedAt = new Date().toISOString();
+      saveFallbackUsers();
+
+      if (!updatedSafe) {
+        const { password, ...safe } = memUsers[idx];
+        updatedSafe = safe;
+      }
+    }
+
+    return updatedSafe;
+  },
+
+  async deleteUser(id) {
+    if (getDBStatus()) {
+      try {
+        await User.findByIdAndDelete(id);
+      } catch (e) {
+        console.warn('DB deleteUser fallback:', e.message);
+      }
+    }
+
+    const idx = memUsers.findIndex((u) => u._id.toString() === id.toString());
+    if (idx !== -1) {
+      memUsers.splice(idx, 1);
+      saveFallbackUsers();
+    }
+    return true;
+  },
+
+  async comparePassword(user, enteredPassword) {
+    if (user && typeof user.comparePassword === 'function') {
+      return await user.comparePassword(enteredPassword);
+    }
+    if (user && user.password) {
+      return await bcrypt.compare(enteredPassword, user.password);
+    }
+    return false;
+  },
 };
+

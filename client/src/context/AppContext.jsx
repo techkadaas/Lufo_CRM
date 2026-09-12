@@ -3,12 +3,57 @@ import { api } from '../services/api.js';
 
 const AppContext = createContext();
 
+const getInitialTab = () => {
+  if (typeof window !== 'undefined') {
+    const hash = window.location.hash.replace('#', '').trim();
+    if (['dashboard', 'orders', 'stocks', 'expenses', 'partners'].includes(hash)) {
+      return hash;
+    }
+    try {
+      const saved = localStorage.getItem('lufo_crm_active_tab');
+      if (['dashboard', 'orders', 'stocks', 'expenses', 'partners'].includes(saved)) {
+        return saved;
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+  return 'dashboard';
+};
+
 export const AppProvider = ({ children }) => {
   const [theme, setTheme] = useState('light');
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTabState] = useState(getInitialTab);
   const [toasts, setToasts] = useState([]);
   const [dashboardData, setDashboardData] = useState(null);
   const [loadingDashboard, setLoadingDashboard] = useState(false);
+
+  const setActiveTab = useCallback((tab) => {
+    setActiveTabState(tab);
+    if (typeof window !== 'undefined') {
+      window.location.hash = tab;
+      try {
+        localStorage.setItem('lufo_crm_active_tab', tab);
+      } catch (e) {
+        // ignore
+      }
+    }
+  }, []);
+
+  // Listen to browser Back/Forward or hash changes
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash.replace('#', '').trim();
+      if (['dashboard', 'orders', 'stocks', 'expenses', 'partners'].includes(hash)) {
+        setActiveTabState(hash);
+        try {
+          localStorage.setItem('lufo_crm_active_tab', hash);
+        } catch (e) {}
+      }
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
 
   // Quick Action Modal states
   const [isCreateOrderOpen, setIsCreateOrderOpen] = useState(false);

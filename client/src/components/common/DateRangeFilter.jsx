@@ -80,11 +80,11 @@ export const DateRangeFilter = ({
       {isOpen && (
         <>
           <div
-            className="fixed inset-0 z-20"
+            className="fixed inset-0 z-40"
             onClick={() => setIsOpen(false)}
           />
 
-          <div className="absolute right-0 sm:left-0 sm:right-auto mt-1.5 w-64 max-w-[calc(100vw-2rem)] bg-white rounded-2xl border border-slate-200 shadow-xl z-30 p-2 space-y-1 animate-in fade-in zoom-in-95 duration-100">
+          <div className="absolute right-0 top-full mt-2 w-64 max-w-[calc(100vw-2rem)] bg-white rounded-2xl border border-slate-200 shadow-2xl z-50 p-2 space-y-1 animate-in fade-in zoom-in-95 duration-150">
             <div className="px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
               Filter by Period
             </div>
@@ -97,9 +97,9 @@ export const DateRangeFilter = ({
                     key={option.id}
                     type="button"
                     onClick={() => handleSelectPreset(option.id)}
-                    className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-left font-medium transition-colors cursor-pointer ${
+                    className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-left font-medium transition-colors cursor-pointer text-xs ${
                       isSelected
-                        ? 'bg-amber-50 text-amber-900 font-semibold'
+                        ? 'bg-amber-50 text-amber-900 font-bold border border-amber-200/60'
                         : 'text-slate-700 hover:bg-slate-50'
                     }`}
                   >
@@ -140,7 +140,7 @@ export const DateRangeFilter = ({
                 <button
                   type="submit"
                   disabled={!tempStart || !tempEnd}
-                  className="w-full py-1.5 px-3 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white rounded-lg font-semibold text-[11px] flex items-center justify-center gap-1 transition-colors"
+                  className="w-full py-1.5 px-3 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white rounded-lg font-semibold text-[11px] flex items-center justify-center gap-1 transition-colors cursor-pointer"
                 >
                   <span>Apply Range</span>
                   <ArrowRight className="w-3 h-3" />

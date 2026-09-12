@@ -411,16 +411,36 @@ export const Store = {
     const netProfit = totalRevenue - totalExpenseAmount;
     const profitMargin = totalRevenue > 0 ? ((netProfit / totalRevenue) * 100).toFixed(1) : 0;
 
-    // Monthly Trends (Past 6 Months mockup/real)
-    const months = ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep'];
-    const monthlyTrends = months.map((month, i) => {
-      const baseRev = 45000 + i * 14000;
-      const baseExp = 28000 + i * 5000;
+    // Monthly Trends (Past 6 Months from real data)
+    const now = new Date();
+    const months = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      months.push({
+        name: d.toLocaleDateString('en-US', { month: 'short' }),
+        year: d.getFullYear(),
+        monthNum: d.getMonth(),
+      });
+    }
+
+    const monthlyTrends = months.map(({ name, year, monthNum }) => {
+      const monthOrders = validOrders.filter((o) => {
+        const d = new Date(o.orderDate || o.createdAt);
+        return d.getFullYear() === year && d.getMonth() === monthNum;
+      });
+      const monthExpenses = expenses.filter((e) => {
+        const d = new Date(e.date || e.createdAt);
+        return d.getFullYear() === year && d.getMonth() === monthNum;
+      });
+
+      const rev = monthOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
+      const exp = monthExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
+
       return {
-        month,
-        revenue: i === 5 ? Math.round(totalRevenue || 75000) : baseRev,
-        expense: i === 5 ? Math.round(totalExpenseAmount || 38000) : baseExp,
-        profit: (i === 5 ? totalRevenue : baseRev) - (i === 5 ? totalExpenseAmount : baseExp),
+        month: name,
+        revenue: Math.round(rev),
+        expense: Math.round(exp),
+        profit: Math.round(rev - exp),
       };
     });
 

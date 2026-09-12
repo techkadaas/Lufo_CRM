@@ -27,83 +27,8 @@ import { AddPartnerIncomeModal } from './AddPartnerIncomeModal';
 import { PartnerLedgerModal } from './PartnerLedgerModal';
 import { EmptyState } from '../common/EmptyState';
 
-const DEFAULT_PARTNERS = [
-  {
-    id: 'ptn-1',
-    name: 'Rahul Sharma',
-    role: 'Managing Partner',
-    phone: '+91 98201 11223',
-    email: 'rahul.sharma@lufo.in',
-    status: 'Active',
-    notes: 'Handles bulk fabric procurement and seasonal collections financing.',
-  },
-  {
-    id: 'ptn-2',
-    name: 'Vikramaditya Verma',
-    role: 'Partner / Co-Founder',
-    phone: '+91 98112 44556',
-    email: 'vikram@lufo.in',
-    status: 'Active',
-    notes: 'Finances tailoring job-work batches, packaging, and logistics setup.',
-  },
-  {
-    id: 'ptn-3',
-    name: 'Priya Nambiar',
-    role: 'Partner',
-    phone: '+91 94471 77889',
-    email: 'priya.n@lufo.in',
-    status: 'Active',
-    notes: 'Provides working capital for D2C marketing and inventory reserve.',
-  },
-];
-
-const DEFAULT_INCOMES = [
-  {
-    id: 'inc-1',
-    partnerId: 'ptn-1',
-    amount: 500000,
-    date: '2026-01-10',
-    paymentMode: 'UPI',
-    purpose: 'Pure Organic Linen & Silk Bulk Fabric Lot Purchase',
-    referenceNo: 'UTR-98210341',
-  },
-  {
-    id: 'inc-2',
-    partnerId: 'ptn-2',
-    amount: 350000,
-    date: '2026-01-22',
-    paymentMode: 'UPI',
-    purpose: 'Stitching Workshop Advance & Designer Button Inventory',
-    referenceNo: 'UTR-10492811',
-  },
-  {
-    id: 'inc-3',
-    partnerId: 'ptn-3',
-    amount: 250000,
-    date: '2026-02-05',
-    paymentMode: 'UPI',
-    purpose: 'Eco-Friendly Garment Bags & Custom Mailer Boxes Batch',
-    referenceNo: 'UPI-7740192',
-  },
-  {
-    id: 'inc-4',
-    partnerId: 'ptn-1',
-    amount: 300000,
-    date: '2026-02-18',
-    paymentMode: 'Cash',
-    purpose: 'Cotton Twill Sourcing for Summer Line Batch 2',
-    referenceNo: 'CASH-REC-041',
-  },
-  {
-    id: 'inc-5',
-    partnerId: 'ptn-2',
-    amount: 200000,
-    date: '2026-03-01',
-    paymentMode: 'Cash',
-    purpose: 'Logistics Courier Wallet Recharge & Dispatch Advance',
-    referenceNo: 'CASH-REC-052',
-  },
-];
+const DEFAULT_PARTNERS = [];
+const DEFAULT_INCOMES = [];
 
 export const PartnersView = () => {
   const { showToast } = useApp();

@@ -1,9 +1,11 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
-import { Menu, Plus, RefreshCw } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
+import { Menu, RefreshCw, UserCheck } from 'lucide-react';
 
 export const Header = ({ onOpenMobileMenu }) => {
-  const { activeTab, triggerRefresh, setIsCreateOrderOpen, loadingDashboard } = useApp();
+  const { activeTab, setActiveTab, triggerRefresh, loadingDashboard } = useApp();
+  const { user } = useAuth();
 
   const titleMap = {
     dashboard: 'Dashboard',
@@ -11,6 +13,7 @@ export const Header = ({ onOpenMobileMenu }) => {
     stocks: 'Stock & Inventory',
     expenses: 'Expenses',
     partners: 'Partners',
+    settings: 'Settings & Team Accounts',
   };
 
   const title = titleMap[activeTab] || 'Dashboard';
@@ -49,8 +52,24 @@ export const Header = ({ onOpenMobileMenu }) => {
           >
             <RefreshCw className="w-4 h-4" />
           </button>
+
+          {user && (
+            <button
+              onClick={() => setActiveTab('settings')}
+              className="hidden sm:flex items-center gap-2 pl-2.5 pr-3 py-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200/80 transition-colors"
+              title="Account Settings"
+            >
+              <div className="w-5 h-5 rounded-full bg-amber-500 text-white font-bold text-[10px] flex items-center justify-center">
+                {user.name ? user.name.slice(0, 1).toUpperCase() : 'A'}
+              </div>
+              <span className="font-semibold text-slate-700 text-xs truncate max-w-[120px]">
+                {user.name}
+              </span>
+            </button>
+          )}
         </div>
       </div>
     </header>
   );
 };
+

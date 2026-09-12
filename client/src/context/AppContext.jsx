@@ -3,15 +3,17 @@ import { api } from '../services/api.js';
 
 const AppContext = createContext();
 
+const VALID_TABS = ['dashboard', 'orders', 'stocks', 'expenses', 'partners', 'settings'];
+
 const getInitialTab = () => {
   if (typeof window !== 'undefined') {
     const hash = window.location.hash.replace('#', '').trim();
-    if (['dashboard', 'orders', 'stocks', 'expenses', 'partners'].includes(hash)) {
+    if (VALID_TABS.includes(hash)) {
       return hash;
     }
     try {
       const saved = localStorage.getItem('lufo_crm_active_tab');
-      if (['dashboard', 'orders', 'stocks', 'expenses', 'partners'].includes(saved)) {
+      if (VALID_TABS.includes(saved)) {
         return saved;
       }
     } catch (e) {
@@ -44,7 +46,7 @@ export const AppProvider = ({ children }) => {
   useEffect(() => {
     const handleHashChange = () => {
       const hash = window.location.hash.replace('#', '').trim();
-      if (['dashboard', 'orders', 'stocks', 'expenses', 'partners'].includes(hash)) {
+      if (VALID_TABS.includes(hash)) {
         setActiveTabState(hash);
         try {
           localStorage.setItem('lufo_crm_active_tab', hash);

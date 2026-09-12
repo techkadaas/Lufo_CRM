@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { AppProvider, useApp } from './context/AppContext';
+import { LoginPage } from './components/auth/LoginPage';
 import { Sidebar } from './components/layout/Sidebar';
 import { Header } from './components/layout/Header';
 import { ToastContainer } from './components/common/Toast';
@@ -13,6 +15,7 @@ import { OrdersPage } from './pages/OrdersPage';
 import { StockPage } from './pages/StockPage';
 import { ExpensesPage } from './pages/ExpensesPage';
 import { PartnersPage } from './pages/PartnersPage';
+import { SettingsPage } from './pages/SettingsPage';
 
 const MainLayout = () => {
   const {
@@ -44,6 +47,7 @@ const MainLayout = () => {
           {activeTab === 'stocks' && <StockPage />}
           {activeTab === 'expenses' && <ExpensesPage />}
           {activeTab === 'partners' && <PartnersPage />}
+          {activeTab === 'settings' && <SettingsPage />}
         </main>
       </div>
 
@@ -83,10 +87,36 @@ const MainLayout = () => {
   );
 };
 
-export default function App() {
+const AuthGuard = () => {
+  const { isAuthenticated, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center gap-4 text-white">
+        <div className="w-10 h-10 border-3 border-amber-500/30 border-t-amber-500 rounded-full animate-spin" />
+        <p className="text-xs uppercase tracking-widest text-slate-400 font-medium">
+          Loading LUFO Clothing CRM...
+        </p>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <LoginPage />;
+  }
+
   return (
     <AppProvider>
       <MainLayout />
     </AppProvider>
   );
+};
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AuthGuard />
+    </AuthProvider>
+  );
 }
+

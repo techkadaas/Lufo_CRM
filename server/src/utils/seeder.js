@@ -1,6 +1,7 @@
 import { Stock } from '../models/Stock.js';
 import { Order } from '../models/Order.js';
 import { Expense } from '../models/Expense.js';
+import { User } from '../models/User.js';
 
 export const initialStockData = [];
 export const initialExpenseData = [];
@@ -29,7 +30,22 @@ export const seedDatabase = async () => {
         $in: ['REC-TEX-9921', 'RENT-SEP-2026', 'BLU-EXP-401', 'PKG-LUX-108', 'META-AD-884'],
       },
     });
+
+    // Seed default admin account if no user exists
+    const adminCount = await User.countDocuments({ role: 'admin' });
+    if (adminCount === 0) {
+      console.log('Seeding initial admin account (ahamed@LufoClothing)...');
+      await User.create({
+        name: 'Ahamed (Admin)',
+        username: 'ahamed@lufoclothing',
+        password: 'ahamed@lufo0987',
+        role: 'admin',
+        isActive: true,
+      });
+      console.log('Admin account created successfully.');
+    }
   } catch (err) {
-    console.warn(`Clean database notice: ${err.message}`);
+    console.warn(`Clean database / seed notice: ${err.message}`);
   }
 };
+

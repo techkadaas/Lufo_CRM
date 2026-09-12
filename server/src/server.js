@@ -8,6 +8,7 @@ import dashboardRoutes from './routes/dashboardRoutes.js';
 import orderRoutes from './routes/orderRoutes.js';
 import stockRoutes from './routes/stockRoutes.js';
 import expenseRoutes from './routes/expenseRoutes.js';
+import authRoutes from './routes/authRoutes.js';
 
 dotenv.config();
 
@@ -31,6 +32,7 @@ app.use((req, res, next) => {
 });
 
 // API Routes
+app.use('/api/auth', authRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/stocks', stockRoutes);

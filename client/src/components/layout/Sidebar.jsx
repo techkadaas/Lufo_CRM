@@ -1,5 +1,6 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
+import { useAuth } from '../../context/AuthContext';
 import {
   LayoutDashboard,
   ShoppingBag,
@@ -7,10 +8,14 @@ import {
   Receipt,
   Handshake,
   Plus,
+  Settings,
+  LogOut,
+  Shield,
 } from 'lucide-react';
 
 export const Sidebar = ({ isMobileOpen, setIsMobileOpen }) => {
   const { activeTab, setActiveTab, setIsCreateOrderOpen } = useApp();
+  const { user, logout } = useAuth();
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -18,11 +23,18 @@ export const Sidebar = ({ isMobileOpen, setIsMobileOpen }) => {
     { id: 'stocks', label: 'Stock', icon: Layers },
     { id: 'expenses', label: 'Expenses', icon: Receipt },
     { id: 'partners', label: 'Partners', icon: Handshake },
+    { id: 'settings', label: 'Settings & Team', icon: Settings },
   ];
 
   const handleNavClick = (tabId) => {
     setActiveTab(tabId);
     if (setIsMobileOpen) setIsMobileOpen(false);
+  };
+
+  const handleLogout = () => {
+    if (window.confirm('Are you sure you want to sign out?')) {
+      logout();
+    }
   };
 
   return (
@@ -95,11 +107,38 @@ export const Sidebar = ({ isMobileOpen, setIsMobileOpen }) => {
           })}
         </nav>
 
-        {/* Minimal Footer */}
-        <div className="p-5 border-t border-slate-100 text-center">
-          <span className="text-[11px] text-slate-400 font-medium">LUFO CLOTHING v1.0</span>
+        {/* User Account & Logout Footer */}
+        <div className="p-3.5 border-t border-slate-100 bg-slate-50/50">
+          <div className="flex items-center justify-between gap-2 p-2 rounded-xl bg-white border border-slate-100 shadow-xs">
+            <div
+              onClick={() => handleNavClick('settings')}
+              className="flex items-center gap-2.5 min-w-0 cursor-pointer flex-1"
+              title="Click to view settings"
+            >
+              <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-800 font-bold text-xs flex items-center justify-center shrink-0">
+                {user?.name ? user.name.slice(0, 1).toUpperCase() : 'A'}
+              </div>
+              <div className="min-w-0">
+                <div className="text-xs font-bold text-slate-900 truncate leading-tight">
+                  {user?.name || 'Admin'}
+                </div>
+                <div className="text-[10px] text-slate-400 capitalize truncate">
+                  {user?.role || 'Admin'}
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={handleLogout}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors shrink-0"
+              title="Sign Out"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </aside>
     </>
   );
 };
+

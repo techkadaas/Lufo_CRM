@@ -36,21 +36,37 @@ export const PartnersView = () => {
   // Active view tab: 'summary' (Partner Cards & Contributions) | 'ledger' (All Transactions History)
   const [activeTab, setActiveTab] = useState('summary');
 
-  // Partners data stored in localStorage
+  // Partners data stored in localStorage (cleared of legacy dummy data)
   const [partners, setPartners] = useState(() => {
     try {
       const saved = localStorage.getItem('lufo_crm_all_partners');
-      return saved ? JSON.parse(saved) : DEFAULT_PARTNERS;
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return parsed.filter(
+          (p) =>
+            !['ptn-1', 'ptn-2', 'ptn-3'].includes(p.id) &&
+            !['Rahul Sharma', 'Vikramaditya Verma', 'Priya Nambiar'].includes(p.name)
+        );
+      }
+      return DEFAULT_PARTNERS;
     } catch {
       return DEFAULT_PARTNERS;
     }
   });
 
-  // Partner Incomes / Capital Contributions
+  // Partner Incomes / Capital Contributions (cleared of legacy dummy data)
   const [incomes, setIncomes] = useState(() => {
     try {
       const saved = localStorage.getItem('lufo_crm_partner_incomes');
-      return saved ? JSON.parse(saved) : DEFAULT_INCOMES;
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return parsed.filter(
+          (i) =>
+            !['inc-1', 'inc-2', 'inc-3', 'inc-4', 'inc-5'].includes(i.id) &&
+            !['ptn-1', 'ptn-2', 'ptn-3'].includes(i.partnerId)
+        );
+      }
+      return DEFAULT_INCOMES;
     } catch {
       return DEFAULT_INCOMES;
     }

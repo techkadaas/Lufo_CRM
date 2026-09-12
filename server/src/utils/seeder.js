@@ -7,6 +7,29 @@ export const initialExpenseData = [];
 export const initialOrderData = [];
 
 export const seedDatabase = async () => {
-  // Database initialized clean without dummy data
-  return;
+  try {
+    // Purge any legacy sample mock data created during initial development
+    await Order.deleteMany({ billNumber: { $in: ['LF-01', 'LF-02', 'LF-03'] } });
+    await Stock.deleteMany({
+      sku: {
+        $in: [
+          'LUFO-SHI-LIN-01',
+          'LUFO-TEE-OBS-02',
+          'LUFO-TRO-PLE-03',
+          'LUFO-DNM-RAW-04',
+          'LUFO-BLZ-VLV-05',
+          'LUFO-DRS-SLK-06',
+          'LUFO-HUD-MON-07',
+          'LUFO-ACC-BLT-08',
+        ],
+      },
+    });
+    await Expense.deleteMany({
+      receiptNumber: {
+        $in: ['REC-TEX-9921', 'RENT-SEP-2026', 'BLU-EXP-401', 'PKG-LUX-108', 'META-AD-884'],
+      },
+    });
+  } catch (err) {
+    console.warn(`Clean database notice: ${err.message}`);
+  }
 };

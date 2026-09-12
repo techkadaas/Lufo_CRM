@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 let isConnected = false;
 
 export const connectDB = async () => {
-  const uri = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/lufo_clothing_crm';
+  const uri = process.env.MONGODB_URI || process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/lufo_clothing_crm';
   
   try {
     const conn = await mongoose.connect(uri, {

@@ -143,13 +143,10 @@ export const CreateExpenseModal = ({ isOpen, onClose }) => {
             <select
               value={formData.paymentMethod}
               onChange={(e) => setFormData({ ...formData, paymentMethod: e.target.value })}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-sm text-slate-900 focus:border-amber-500 focus:bg-white outline-none"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-sm text-slate-900 focus:border-amber-500 focus:bg-white outline-none cursor-pointer"
             >
-              <option value="UPI">UPI / QR</option>
-              <option value="Bank Transfer">Bank Transfer / NEFT</option>
-              <option value="Cash">Cash Voucher</option>
-              <option value="Credit Card">Corporate Credit Card</option>
-              <option value="Cheque">Cheque</option>
+              <option value="Cash">Cash</option>
+              <option value="UPI">UPI</option>
             </select>
           </div>
         </div>

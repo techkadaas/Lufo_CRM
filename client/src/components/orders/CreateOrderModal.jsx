@@ -295,123 +295,77 @@ export const CreateOrderModal = ({ isOpen, onClose }) => {
       maxWidth="max-w-4xl"
     >
       <div className="space-y-5">
-        {/* 2-Step Progress Indicator Bar */}
-        <div className="flex items-center justify-center py-2 px-2 sm:px-6">
-          <div className="w-full max-w-md flex items-center justify-between relative">
-            {/* Connecting progress bar */}
-            <div className="absolute left-10 right-10 top-4 -translate-y-1/2 h-1 bg-slate-200 z-0 rounded-full" />
-            <div
-              className={`absolute left-10 top-4 -translate-y-1/2 h-1 bg-amber-600 transition-all duration-300 z-0 rounded-full ${
-                step === 2 ? 'right-10' : 'w-1/2'
-              }`}
-            />
+        {/* Top Header Row with Steps & Compact Bill Badge */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pb-2 border-b border-slate-100">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-amber-50/80 border border-amber-200/80 text-amber-900 text-xs font-medium shadow-2xs">
+            <Receipt className="w-3.5 h-3.5 text-amber-700" />
+            <span className="text-[11px] text-slate-500 font-semibold">Bill No:</span>
+            <span className="font-mono font-bold text-amber-950">{billNumber || 'Generating...'}</span>
+          </div>
 
-            {/* Step 1 Pill */}
-            <button
-              type="button"
-              onClick={() => setStep(1)}
-              className="relative z-10 flex flex-col items-center gap-1.5 group cursor-pointer focus:outline-none"
-            >
+          {/* 2-Step Progress Indicator */}
+          <div className="w-full sm:w-auto flex items-center justify-center">
+            <div className="w-64 sm:w-72 flex items-center justify-between relative">
+              {/* Connecting progress bar */}
+              <div className="absolute left-6 right-6 top-3.5 -translate-y-1/2 h-1 bg-slate-200 z-0 rounded-full" />
               <div
-                className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs transition-all ${
-                  step === 1
-                    ? 'bg-amber-600 text-white ring-4 ring-amber-100 shadow-md scale-105'
-                    : 'bg-emerald-600 text-white shadow-xs'
+                className={`absolute left-6 top-3.5 -translate-y-1/2 h-1 bg-amber-600 transition-all duration-300 z-0 rounded-full ${
+                  step === 2 ? 'right-6' : 'w-1/2'
                 }`}
-              >
-                {step > 1 ? <Check className="w-4 h-4 stroke-[3]" /> : '1'}
-              </div>
-              <span
-                className={`text-[11px] font-bold tracking-tight transition-colors ${
-                  step === 1 ? 'text-amber-800' : 'text-slate-600'
-                }`}
-              >
-                1. Customer & Billing
-              </span>
-            </button>
+              />
 
-            {/* Step 2 Pill */}
-            <button
-              type="button"
-              onClick={() => {
-                if (customer.phone.trim() && customer.name.trim()) {
-                  setStep(2);
-                } else {
-                  handleProceedToStep2();
-                }
-              }}
-              className="relative z-10 flex flex-col items-center gap-1.5 group cursor-pointer focus:outline-none"
-            >
-              <div
-                className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs transition-all ${
-                  step === 2
-                    ? 'bg-amber-600 text-white ring-4 ring-amber-100 shadow-md scale-105'
-                    : 'bg-slate-200 text-slate-500'
-                }`}
+              {/* Step 1 Pill */}
+              <button
+                type="button"
+                onClick={() => setStep(1)}
+                className="relative z-10 flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold transition-all cursor-pointer bg-white"
               >
-                2
-              </div>
-              <span
-                className={`text-[11px] font-bold tracking-tight transition-colors ${
-                  step === 2 ? 'text-amber-800' : 'text-slate-400'
-                }`}
+                <div
+                  className={`w-6 h-6 rounded-full flex items-center justify-center font-bold text-[11px] transition-all ${
+                    step === 1
+                      ? 'bg-amber-600 text-white ring-2 ring-amber-200 shadow-xs'
+                      : 'bg-emerald-600 text-white'
+                  }`}
+                >
+                  {step > 1 ? <Check className="w-3.5 h-3.5 stroke-[3]" /> : '1'}
+                </div>
+                <span className={step === 1 ? 'text-amber-900 font-bold' : 'text-slate-600 font-medium'}>
+                  1. Customer
+                </span>
+              </button>
+
+              {/* Step 2 Pill */}
+              <button
+                type="button"
+                onClick={() => {
+                  if (customer.phone.trim() && customer.name.trim()) {
+                    setStep(2);
+                  } else {
+                    handleProceedToStep2();
+                  }
+                }}
+                className="relative z-10 flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold transition-all cursor-pointer bg-white"
               >
-                2. Items & Financials
-              </span>
-            </button>
+                <div
+                  className={`w-6 h-6 rounded-full flex items-center justify-center font-bold text-[11px] transition-all ${
+                    step === 2
+                      ? 'bg-amber-600 text-white ring-2 ring-amber-200 shadow-xs'
+                      : 'bg-slate-200 text-slate-500'
+                  }`}
+                >
+                  2
+                </div>
+                <span className={step === 2 ? 'text-amber-900 font-bold' : 'text-slate-400 font-medium'}>
+                  2. Items & Payment
+                </span>
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* STEP 1: Customer Information & Billing Settings */}
+        {/* STEP 1: Customer Information */}
         {step === 1 && (
           <div className="space-y-5 animate-in fade-in zoom-in-98 duration-150">
-            {/* Bill Metadata & Payment Header */}
-            <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-2xl bg-amber-50/60 border border-amber-200">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-amber-600 text-white flex items-center justify-center shadow-xs">
-                  <Receipt className="w-5 h-5" />
-                </div>
-                <div>
-                  <span className="text-[11px] text-amber-800 uppercase font-bold tracking-wider">
-                    Auto Bill Number
-                  </span>
-                  <div className="font-mono text-base sm:text-lg font-bold text-amber-950">
-                    {billNumber || 'Generating...'}
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-3">
-                <div>
-                  <label className="text-[11px] text-slate-600 font-semibold block mb-1">Payment Mode</label>
-                  <select
-                    value={paymentMethod}
-                    onChange={(e) => setPaymentMethod(e.target.value)}
-                    className="bg-white border border-slate-300 rounded-xl px-3 py-1.5 text-xs text-slate-800 font-medium focus:border-amber-500 outline-none shadow-2xs cursor-pointer"
-                  >
-                    <option value="UPI">UPI / QR Code</option>
-                    <option value="Cash">Cash on Counter</option>
-                    <option value="Credit/Debit Card">Credit / Debit Card</option>
-                    <option value="Bank Transfer">Bank Wire Transfer</option>
-                    <option value="Store Credit">Store Credit</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-[11px] text-slate-600 font-semibold block mb-1">Payment Status</label>
-                  <select
-                    value={paymentStatus}
-                    onChange={(e) => setPaymentStatus(e.target.value)}
-                    className="bg-white border border-slate-300 rounded-xl px-3 py-1.5 text-xs text-slate-800 font-medium focus:border-amber-500 outline-none shadow-2xs cursor-pointer"
-                  >
-                    <option value="Paid">Paid</option>
-                    <option value="Pending">Pending</option>
-                    <option value="Partial">Partial</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
             {/* Customer Information Section */}
             <div className="space-y-4 p-5 rounded-2xl bg-white border border-slate-200 shadow-2xs">
               <div className="flex items-center justify-between pb-2 border-b border-slate-100">
@@ -793,12 +747,12 @@ export const CreateOrderModal = ({ isOpen, onClose }) => {
               </div>
             </div>
 
-            {/* Order Notes & Bill Financials */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-2 border-t border-slate-200">
-              <div>
+            {/* Order Notes & Bill Financials / Payment Mode */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 pt-2 border-t border-slate-200">
+              <div className="space-y-3">
                 <label className="text-xs text-slate-700 block mb-1 font-semibold">Special Instructions / Alteration Notes</label>
                 <textarea
-                  rows={3}
+                  rows={4}
                   placeholder="e.g. Custom packaging, hem alterations, or gift message..."
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
@@ -806,7 +760,44 @@ export const CreateOrderModal = ({ isOpen, onClose }) => {
                 />
               </div>
 
-              <div className="space-y-2.5 text-xs bg-slate-50/80 p-4 rounded-2xl border border-slate-200">
+              {/* Payment & Financials Box */}
+              <div className="space-y-3 text-xs bg-slate-50/90 p-4 rounded-2xl border border-slate-200 shadow-2xs">
+                <h5 className="font-bold text-slate-900 text-xs uppercase tracking-wider flex items-center gap-1.5 pb-2 border-b border-slate-200">
+                  <CreditCard className="w-3.5 h-3.5 text-amber-600" /> Payment & Billing
+                </h5>
+
+                {/* Payment Mode & Status Selection (Only Cash & UPI) */}
+                <div className="grid grid-cols-2 gap-3 pb-2 border-b border-slate-200">
+                  <div>
+                    <label className="text-[11px] text-slate-700 font-semibold block mb-1">
+                      Payment Mode
+                    </label>
+                    <select
+                      value={paymentMethod}
+                      onChange={(e) => setPaymentMethod(e.target.value)}
+                      className="w-full bg-white border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs text-slate-900 font-medium focus:border-amber-500 outline-none shadow-2xs cursor-pointer"
+                    >
+                      <option value="Cash">Cash</option>
+                      <option value="UPI">UPI</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] text-slate-700 font-semibold block mb-1">
+                      Payment Status
+                    </label>
+                    <select
+                      value={paymentStatus}
+                      onChange={(e) => setPaymentStatus(e.target.value)}
+                      className="w-full bg-white border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs text-slate-900 font-medium focus:border-amber-500 outline-none shadow-2xs cursor-pointer"
+                    >
+                      <option value="Paid">Paid</option>
+                      <option value="Pending">Pending</option>
+                      <option value="Partial">Partial</option>
+                    </select>
+                  </div>
+                </div>
+
                 <div className="flex justify-between text-slate-700 font-medium">
                   <span>Items Subtotal:</span>
                   <span className="font-mono font-bold text-slate-900">₹{subtotal.toLocaleString()}</span>
@@ -823,7 +814,7 @@ export const CreateOrderModal = ({ isOpen, onClose }) => {
                   />
                 </div>
 
-                <div className="pt-2.5 border-t border-slate-200 flex justify-between items-center text-sm font-bold text-slate-900">
+                <div className="pt-2 border-t border-slate-200 flex justify-between items-center text-sm font-bold text-slate-900">
                   <span className="text-amber-800 uppercase tracking-wider text-xs">Final Payable Total:</span>
                   <span className="font-mono text-xl text-amber-700">₹{totalAmount.toLocaleString()}</span>
                 </div>

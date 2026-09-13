@@ -244,6 +244,13 @@ export const CreateOrderModal = ({ isOpen, onClose }) => {
           // Ignore
         }
 
+        // Cache order in localStorage so it never disappears on production server restarts
+        try {
+          const cached = JSON.parse(localStorage.getItem('lufo_crm_cached_orders') || '[]');
+          const updated = [res.data, ...cached.filter((o) => o.billNumber !== res.data.billNumber && o._id !== res.data._id)];
+          localStorage.setItem('lufo_crm_cached_orders', JSON.stringify(updated));
+        } catch (e) {}
+
         showToast(`Order & Bill ${res.data.billNumber} created successfully!`);
         triggerRefresh();
         onClose();

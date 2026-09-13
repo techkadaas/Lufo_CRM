@@ -32,10 +32,34 @@ export const OrderList = () => {
         startDate: dateFilter.startDate,
         endDate: dateFilter.endDate,
       });
-      if (res.success) {
-        setOrders(res.data);
-      }
+
+      let currentOrders = res.success ? res.data : [];
+
+      // Resilient local cache merge to preserve orders across production cold restarts
+      try {
+        const cached = JSON.parse(localStorage.getItem('lufo_crm_cached_orders') || '[]');
+        if (cached && cached.length > 0) {
+          const serverIds = new Set(currentOrders.map((o) => o._id || o.billNumber));
+          const missingLocals = cached.filter((c) => !serverIds.has(c._id || c.billNumber));
+          
+          if (missingLocals.length > 0) {
+            currentOrders = [...missingLocals, ...currentOrders];
+          }
+        }
+        if (currentOrders.length > 0) {
+          localStorage.setItem('lufo_crm_cached_orders', JSON.stringify(currentOrders));
+        }
+      } catch (e) {}
+
+      setOrders(currentOrders);
     } catch (err) {
+      try {
+        const cached = JSON.parse(localStorage.getItem('lufo_crm_cached_orders') || '[]');
+        if (cached && cached.length > 0) {
+          setOrders(cached);
+          return;
+        }
+      } catch (e) {}
       showToast('Failed to load orders', 'error');
     } finally {
       setLoading(false);
@@ -47,6 +71,12 @@ export const OrderList = () => {
       const res = await api.updateOrderStatus(orderId, newStatus);
       if (res.success) {
         showToast(`Status updated to ${newStatus}`);
+        // Update local cache
+        try {
+          const cached = JSON.parse(localStorage.getItem('lufo_crm_cached_orders') || '[]');
+          const updated = cached.map((o) => (o._id === orderId ? { ...o, status: newStatus } : o));
+          localStorage.setItem('lufo_crm_cached_orders', JSON.stringify(updated));
+        } catch (e) {}
         fetchOrders();
         triggerRefresh();
       }
@@ -62,6 +92,12 @@ export const OrderList = () => {
       const res = await api.deleteOrder(orderId);
       if (res.success) {
         showToast(`Order ${billNumber} deleted`);
+        // Remove from local cache
+        try {
+          const cached = JSON.parse(localStorage.getItem('lufo_crm_cached_orders') || '[]');
+          const updated = cached.filter((o) => o._id !== orderId && o.billNumber !== billNumber);
+          localStorage.setItem('lufo_crm_cached_orders', JSON.stringify(updated));
+        } catch (e) {}
         fetchOrders();
         triggerRefresh();
       }

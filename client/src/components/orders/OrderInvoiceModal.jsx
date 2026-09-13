@@ -294,7 +294,7 @@ ${itemsText}
               {/* Brand Logo & Taglines */}
               <div className="min-w-0">
                 <h1 className="text-3xl sm:text-4xl font-extrabold tracking-[0.22em] text-black font-serif uppercase leading-none">
-                  LUFO<span className="text-[14px] sm:text-lg align-top font-sans font-normal ml-0.5">™</span>
+                  LUFO
                 </h1>
                 <p className="text-[10px] sm:text-[11px] font-bold tracking-[0.42em] text-slate-900 uppercase mt-1.5 pl-0.5 whitespace-nowrap">
                   C L O T H I N G
@@ -423,8 +423,8 @@ ${itemsText}
               {/* Left: Cursive Thank You Note with no wrapping / overlap */}
               <div className="pt-1 pb-1">
                 <div
-                  className="text-4xl sm:text-5xl text-slate-900 font-bold -rotate-3 select-none tracking-normal whitespace-nowrap mb-2 leading-tight"
-                  style={{ fontFamily: "'Reenie Beanie', 'Caveat', 'Alex Brush', 'Dancing Script', cursive" }}
+                  className="text-4xl sm:text-5xl text-slate-900 font-semibold -rotate-2 select-none tracking-normal whitespace-nowrap mb-2 leading-tight"
+                  style={{ fontFamily: "'Great Vibes', 'Alex Brush', 'Dancing Script', 'Caveat', cursive" }}
                 >
                   Thank You!
                 </div>
@@ -498,10 +498,10 @@ ${itemsText}
 
                 {/* LUFO Signature on bottom right */}
                 <div
-                  className="text-3xl sm:text-4xl font-bold text-slate-800 -rotate-6 select-none leading-none pr-1"
-                  style={{ fontFamily: "'Reenie Beanie', 'Caveat', 'Alex Brush', 'Dancing Script', cursive" }}
+                  className="text-3xl sm:text-4xl font-semibold text-slate-800 -rotate-6 select-none leading-none pr-1"
+                  style={{ fontFamily: "'Great Vibes', 'Alex Brush', 'Dancing Script', 'Caveat', cursive" }}
                 >
-                  Lufo<span className="text-[10px] font-sans font-normal align-top ml-0.5">™</span>
+                  Lufo
                 </div>
               </div>
             </div>

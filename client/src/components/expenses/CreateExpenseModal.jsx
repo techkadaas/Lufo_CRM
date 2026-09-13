@@ -51,6 +51,11 @@ export const CreateExpenseModal = ({ isOpen, onClose }) => {
       });
 
       if (res.success) {
+        try {
+          const cached = JSON.parse(localStorage.getItem('lufo_crm_cached_expenses') || '[]');
+          const updated = [res.data, ...cached.filter((e) => e._id !== res.data._id)];
+          localStorage.setItem('lufo_crm_cached_expenses', JSON.stringify(updated));
+        } catch (e) {}
         showToast(`Expense of ₹${Number(formData.amount).toLocaleString()} recorded`);
         triggerRefresh();
         onClose();

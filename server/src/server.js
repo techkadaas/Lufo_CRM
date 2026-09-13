@@ -1,6 +1,9 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { connectDB } from './config/db.js';
 import { seedDatabase } from './utils/seeder.js';
 
@@ -9,6 +12,10 @@ import orderRoutes from './routes/orderRoutes.js';
 import stockRoutes from './routes/stockRoutes.js';
 import expenseRoutes from './routes/expenseRoutes.js';
 import authRoutes from './routes/authRoutes.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const CLIENT_DIST = path.join(__dirname, '..', '..', 'client', 'dist');
 
 dotenv.config();
 
@@ -62,7 +69,16 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// 404 Handler
+// Serve static frontend files if built
+if (fs.existsSync(CLIENT_DIST)) {
+  app.use(express.static(CLIENT_DIST));
+  app.get('*', (req, res, next) => {
+    if (req.url.startsWith('/api')) return next();
+    res.sendFile(path.join(CLIENT_DIST, 'index.html'));
+  });
+}
+
+// 404 Handler for API routes
 app.use((req, res) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.status(404).json({ success: false, message: `Route ${req.originalUrl} not found` });

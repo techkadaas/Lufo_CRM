@@ -20,10 +20,31 @@ export const ExpenseList = () => {
     try {
       setLoading(true);
       const res = await api.getExpenses({ search, category: categoryFilter });
-      if (res.success) {
-        setExpenses(res.data);
-      }
+      let currentExpenses = res.success ? res.data : [];
+
+      try {
+        const cached = JSON.parse(localStorage.getItem('lufo_crm_cached_expenses') || '[]');
+        if (cached && cached.length > 0) {
+          const serverIds = new Set(currentExpenses.map((e) => e._id || e.receiptNumber));
+          const missingLocals = cached.filter((c) => !serverIds.has(c._id || c.receiptNumber));
+          if (missingLocals.length > 0) {
+            currentExpenses = [...missingLocals, ...currentExpenses];
+          }
+        }
+        if (currentExpenses.length > 0) {
+          localStorage.setItem('lufo_crm_cached_expenses', JSON.stringify(currentExpenses));
+        }
+      } catch (e) {}
+
+      setExpenses(currentExpenses);
     } catch (err) {
+      try {
+        const cached = JSON.parse(localStorage.getItem('lufo_crm_cached_expenses') || '[]');
+        if (cached && cached.length > 0) {
+          setExpenses(cached);
+          return;
+        }
+      } catch (e) {}
       showToast('Failed to load expenses', 'error');
     } finally {
       setLoading(false);
@@ -37,6 +58,11 @@ export const ExpenseList = () => {
       const res = await api.deleteExpense(id);
       if (res.success) {
         showToast('Expense deleted');
+        try {
+          const cached = JSON.parse(localStorage.getItem('lufo_crm_cached_expenses') || '[]');
+          const updated = cached.filter((e) => e._id !== id);
+          localStorage.setItem('lufo_crm_cached_expenses', JSON.stringify(updated));
+        } catch (e) {}
         fetchExpenses();
         triggerRefresh();
       }

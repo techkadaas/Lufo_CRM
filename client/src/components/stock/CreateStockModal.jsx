@@ -109,11 +109,21 @@ export const CreateStockModal = ({ isOpen, onClose, editItem = null }) => {
       if (editItem) {
         const res = await api.updateStock(editItem._id, payload);
         if (res.success) {
+          try {
+            const cached = JSON.parse(localStorage.getItem('lufo_crm_cached_stocks') || '[]');
+            const updated = cached.map((s) => (s._id === editItem._id ? { ...s, ...payload } : s));
+            localStorage.setItem('lufo_crm_cached_stocks', JSON.stringify(updated));
+          } catch (e) {}
           showToast(`Stock item updated successfully`);
         }
       } else {
         const res = await api.createStock(payload);
         if (res.success) {
+          try {
+            const cached = JSON.parse(localStorage.getItem('lufo_crm_cached_stocks') || '[]');
+            const updated = [res.data, ...cached.filter((s) => s.sku !== res.data.sku && s._id !== res.data._id)];
+            localStorage.setItem('lufo_crm_cached_stocks', JSON.stringify(updated));
+          } catch (e) {}
           showToast(`Apparel "${res.data.name}" added to inventory`);
         }
       }

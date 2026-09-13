@@ -24,10 +24,31 @@ export const StockList = () => {
     try {
       setLoading(true);
       const res = await api.getStocks({ search, category: categoryFilter });
-      if (res.success) {
-        setStocks(res.data);
-      }
+      let currentStocks = res.success ? res.data : [];
+
+      try {
+        const cached = JSON.parse(localStorage.getItem('lufo_crm_cached_stocks') || '[]');
+        if (cached && cached.length > 0) {
+          const serverSkus = new Set(currentStocks.map((s) => s.sku || s._id));
+          const missingLocals = cached.filter((c) => !serverSkus.has(c.sku || c._id));
+          if (missingLocals.length > 0) {
+            currentStocks = [...missingLocals, ...currentStocks];
+          }
+        }
+        if (currentStocks.length > 0) {
+          localStorage.setItem('lufo_crm_cached_stocks', JSON.stringify(currentStocks));
+        }
+      } catch (e) {}
+
+      setStocks(currentStocks);
     } catch (err) {
+      try {
+        const cached = JSON.parse(localStorage.getItem('lufo_crm_cached_stocks') || '[]');
+        if (cached && cached.length > 0) {
+          setStocks(cached);
+          return;
+        }
+      } catch (e) {}
       showToast('Failed to load inventory', 'error');
     } finally {
       setLoading(false);
@@ -41,6 +62,11 @@ export const StockList = () => {
       const res = await api.deleteStock(id);
       if (res.success) {
         showToast(`Item removed`);
+        try {
+          const cached = JSON.parse(localStorage.getItem('lufo_crm_cached_stocks') || '[]');
+          const updated = cached.filter((s) => s._id !== id);
+          localStorage.setItem('lufo_crm_cached_stocks', JSON.stringify(updated));
+        } catch (e) {}
         fetchStocks();
         triggerRefresh();
       }

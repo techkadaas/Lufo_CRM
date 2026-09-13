@@ -295,46 +295,60 @@ export const CreateOrderModal = ({ isOpen, onClose }) => {
       maxWidth="max-w-4xl"
     >
       <div className="space-y-5">
-        {/* Top Header Row with Steps & Compact Bill Badge */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pb-2 border-b border-slate-100">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-amber-50/80 border border-amber-200/80 text-amber-900 text-xs font-medium shadow-2xs">
-            <Receipt className="w-3.5 h-3.5 text-amber-700" />
-            <span className="text-[11px] text-slate-500 font-semibold">Bill No:</span>
-            <span className="font-mono font-bold text-amber-950">{billNumber || 'Generating...'}</span>
+        {/* Top Stepper Area with compact bill badge */}
+        <div className="pt-1 pb-3 border-b border-slate-100">
+          {/* Top Bar with Bill Badge and Step Counter */}
+          <div className="flex items-center justify-between mb-2.5 px-1">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50/90 border border-amber-200/80 text-amber-900 text-xs font-medium shadow-2xs">
+              <Receipt className="w-3.5 h-3.5 text-amber-600" />
+              <span className="text-[11px] text-slate-500 font-semibold">Bill No:</span>
+              <span className="font-mono font-bold text-amber-950">{billNumber || 'Generating...'}</span>
+            </div>
+            <div className="text-[11px] font-semibold text-slate-400">
+              Step <span className="text-amber-800 font-bold">{step}</span> of 2
+            </div>
           </div>
 
-          {/* 2-Step Progress Indicator */}
-          <div className="w-full sm:w-auto flex items-center justify-center">
-            <div className="w-64 sm:w-72 flex items-center justify-between relative">
-              {/* Connecting progress bar */}
-              <div className="absolute left-6 right-6 top-3.5 -translate-y-1/2 h-1 bg-slate-200 z-0 rounded-full" />
+          {/* Centered Step Progress Stepper */}
+          <div className="max-w-xs sm:max-w-sm mx-auto px-4 relative">
+            {/* Connecting Horizontal Line between circle centers */}
+            <div className="absolute top-4 left-12 right-12 -translate-y-1/2 h-[2px] bg-slate-200 z-0">
               <div
-                className={`absolute left-6 top-3.5 -translate-y-1/2 h-1 bg-amber-600 transition-all duration-300 z-0 rounded-full ${
-                  step === 2 ? 'right-6' : 'w-1/2'
+                className={`h-full bg-amber-500 transition-all duration-300 ${
+                  step === 2 ? 'w-full' : 'w-0'
                 }`}
               />
+            </div>
 
-              {/* Step 1 Pill */}
+            {/* Steps Container */}
+            <div className="relative z-10 flex items-center justify-between">
+              {/* Step 1 */}
               <button
                 type="button"
                 onClick={() => setStep(1)}
-                className="relative z-10 flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold transition-all cursor-pointer bg-white"
+                className="flex flex-col items-center group cursor-pointer focus:outline-none"
               >
                 <div
-                  className={`w-6 h-6 rounded-full flex items-center justify-center font-bold text-[11px] transition-all ${
+                  className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs transition-all duration-200 ${
                     step === 1
-                      ? 'bg-amber-600 text-white ring-2 ring-amber-200 shadow-xs'
-                      : 'bg-emerald-600 text-white'
+                      ? 'bg-amber-500 text-white shadow-md ring-4 ring-amber-100 scale-105'
+                      : 'bg-amber-500 text-white'
                   }`}
                 >
-                  {step > 1 ? <Check className="w-3.5 h-3.5 stroke-[3]" /> : '1'}
+                  {step > 1 ? <Check className="w-4 h-4 stroke-[3]" /> : '1'}
                 </div>
-                <span className={step === 1 ? 'text-amber-900 font-bold' : 'text-slate-600 font-medium'}>
-                  1. Customer
+                <span
+                  className={`mt-1.5 text-xs font-semibold tracking-tight transition-colors ${
+                    step === 1
+                      ? 'text-amber-900 font-bold'
+                      : 'text-slate-700 font-medium'
+                  }`}
+                >
+                  Customer Details
                 </span>
               </button>
 
-              {/* Step 2 Pill */}
+              {/* Step 2 */}
               <button
                 type="button"
                 onClick={() => {
@@ -344,19 +358,25 @@ export const CreateOrderModal = ({ isOpen, onClose }) => {
                     handleProceedToStep2();
                   }
                 }}
-                className="relative z-10 flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold transition-all cursor-pointer bg-white"
+                className="flex flex-col items-center group cursor-pointer focus:outline-none"
               >
                 <div
-                  className={`w-6 h-6 rounded-full flex items-center justify-center font-bold text-[11px] transition-all ${
+                  className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs transition-all duration-200 ${
                     step === 2
-                      ? 'bg-amber-600 text-white ring-2 ring-amber-200 shadow-xs'
-                      : 'bg-slate-200 text-slate-500'
+                      ? 'bg-amber-500 text-white shadow-md ring-4 ring-amber-100 scale-105'
+                      : 'bg-slate-100 text-slate-400 border border-slate-200'
                   }`}
                 >
                   2
                 </div>
-                <span className={step === 2 ? 'text-amber-900 font-bold' : 'text-slate-400 font-medium'}>
-                  2. Items & Payment
+                <span
+                  className={`mt-1.5 text-xs font-semibold tracking-tight transition-colors ${
+                    step === 2
+                      ? 'text-amber-900 font-bold'
+                      : 'text-slate-400'
+                  }`}
+                >
+                  Items & Payment
                 </span>
               </button>
             </div>

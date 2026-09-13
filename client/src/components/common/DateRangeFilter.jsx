@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Calendar, ChevronDown, Check, X, ArrowRight } from 'lucide-react';
 
 export const FILTER_OPTIONS = [
+  { id: 'all_time', label: 'All Time' },
   { id: 'today', label: 'Today' },
   { id: 'yesterday', label: 'Yesterday' },
   { id: 'this_week', label: 'This Week' },

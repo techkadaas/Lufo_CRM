@@ -4,6 +4,15 @@
  */
 export const getDateRange = ({ timeRange, startDate, endDate }) => {
   if (!timeRange && !startDate && !endDate) return null;
+  if (
+    timeRange === 'all' ||
+    timeRange === 'all_time' ||
+    timeRange === 'all time' ||
+    timeRange === 'All' ||
+    timeRange === 'All Time'
+  ) {
+    return null;
+  }
 
   const now = new Date();
 

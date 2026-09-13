@@ -228,6 +228,7 @@ export const CreateOrderModal = ({ isOpen, onClose }) => {
         paymentStatus,
         notes,
         status: 'Pending',
+        orderDate: new Date().toISOString(),
       };
 
       const res = await api.createOrder(payload);

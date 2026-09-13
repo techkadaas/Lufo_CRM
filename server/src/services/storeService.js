@@ -14,6 +14,9 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const STORE_DIR = path.join(__dirname, '..', 'store');
 const USERS_FILE = path.join(STORE_DIR, 'users_store.json');
+const STOCKS_FILE = path.join(STORE_DIR, 'stocks_store.json');
+const EXPENSES_FILE = path.join(STORE_DIR, 'expenses_store.json');
+const ORDERS_FILE = path.join(STORE_DIR, 'orders_store.json');
 
 // Ensure store directory exists
 if (!fs.existsSync(STORE_DIR)) {
@@ -63,27 +66,110 @@ const saveFallbackUsers = () => {
   }
 };
 
-// In-memory fallback dataset
-let memStocks = initialStockData.map((item, idx) => ({
-  ...item,
-  _id: `mem_stock_${idx + 1}`,
-  createdAt: new Date().toISOString(),
-  updatedAt: new Date().toISOString(),
-}));
+// Load or initialize fallback stocks
+const loadFallbackStocks = () => {
+  try {
+    if (fs.existsSync(STOCKS_FILE)) {
+      const data = fs.readFileSync(STOCKS_FILE, 'utf8');
+      return JSON.parse(data);
+    }
+  } catch (err) {
+    console.warn('Error reading fallback stocks file:', err.message);
+  }
 
-let memExpenses = initialExpenseData.map((item, idx) => ({
-  ...item,
-  _id: `mem_exp_${idx + 1}`,
-  createdAt: new Date().toISOString(),
-  updatedAt: new Date().toISOString(),
-}));
+  const initial = initialStockData.map((item, idx) => ({
+    ...item,
+    _id: `mem_stock_${idx + 1}`,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  }));
 
-let memOrders = initialOrderData.map((item, idx) => ({
-  ...item,
-  _id: `mem_ord_${idx + 1}`,
-  createdAt: new Date().toISOString(),
-  updatedAt: new Date().toISOString(),
-}));
+  try {
+    fs.writeFileSync(STOCKS_FILE, JSON.stringify(initial, null, 2), 'utf8');
+  } catch (e) {}
+
+  return initial;
+};
+
+let memStocks = loadFallbackStocks();
+
+const saveFallbackStocks = () => {
+  try {
+    fs.writeFileSync(STOCKS_FILE, JSON.stringify(memStocks, null, 2), 'utf8');
+  } catch (err) {
+    console.warn('Error saving fallback stocks:', err.message);
+  }
+};
+
+// Load or initialize fallback expenses
+const loadFallbackExpenses = () => {
+  try {
+    if (fs.existsSync(EXPENSES_FILE)) {
+      const data = fs.readFileSync(EXPENSES_FILE, 'utf8');
+      return JSON.parse(data);
+    }
+  } catch (err) {
+    console.warn('Error reading fallback expenses file:', err.message);
+  }
+
+  const initial = initialExpenseData.map((item, idx) => ({
+    ...item,
+    _id: `mem_exp_${idx + 1}`,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  }));
+
+  try {
+    fs.writeFileSync(EXPENSES_FILE, JSON.stringify(initial, null, 2), 'utf8');
+  } catch (e) {}
+
+  return initial;
+};
+
+let memExpenses = loadFallbackExpenses();
+
+const saveFallbackExpenses = () => {
+  try {
+    fs.writeFileSync(EXPENSES_FILE, JSON.stringify(memExpenses, null, 2), 'utf8');
+  } catch (err) {
+    console.warn('Error saving fallback expenses:', err.message);
+  }
+};
+
+// Load or initialize fallback orders
+const loadFallbackOrders = () => {
+  try {
+    if (fs.existsSync(ORDERS_FILE)) {
+      const data = fs.readFileSync(ORDERS_FILE, 'utf8');
+      return JSON.parse(data);
+    }
+  } catch (err) {
+    console.warn('Error reading fallback orders file:', err.message);
+  }
+
+  const initial = initialOrderData.map((item, idx) => ({
+    ...item,
+    _id: `mem_ord_${idx + 1}`,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  }));
+
+  try {
+    fs.writeFileSync(ORDERS_FILE, JSON.stringify(initial, null, 2), 'utf8');
+  } catch (e) {}
+
+  return initial;
+};
+
+let memOrders = loadFallbackOrders();
+
+const saveFallbackOrders = () => {
+  try {
+    fs.writeFileSync(ORDERS_FILE, JSON.stringify(memOrders, null, 2), 'utf8');
+  } catch (err) {
+    console.warn('Error saving fallback orders:', err.message);
+  }
+};
 
 
 export const Store = {
@@ -139,6 +225,7 @@ export const Store = {
       updatedAt: new Date().toISOString(),
     };
     memStocks.unshift(newStock);
+    saveFallbackStocks();
     return newStock;
   },
 
@@ -149,6 +236,7 @@ export const Store = {
     const index = memStocks.findIndex((s) => s._id.toString() === id.toString());
     if (index === -1) return null;
     memStocks[index] = { ...memStocks[index], ...data, updatedAt: new Date().toISOString() };
+    saveFallbackStocks();
     return memStocks[index];
   },
 
@@ -159,6 +247,7 @@ export const Store = {
     const index = memStocks.findIndex((s) => s._id.toString() === id.toString());
     if (index === -1) return null;
     const deleted = memStocks.splice(index, 1);
+    saveFallbackStocks();
     return deleted[0];
   },
 
@@ -173,6 +262,7 @@ export const Store = {
     if (index === -1) return null;
     memStocks[index].quantity = Math.max(0, memStocks[index].quantity + adjustment);
     memStocks[index].updatedAt = new Date().toISOString();
+    saveFallbackStocks();
     return memStocks[index];
   },
 
@@ -331,6 +421,7 @@ export const Store = {
       updatedAt: new Date().toISOString(),
     };
     memOrders.unshift(newOrder);
+    saveFallbackOrders();
     return newOrder;
   },
 
@@ -362,6 +453,7 @@ export const Store = {
     }
     order.status = status;
     order.updatedAt = new Date().toISOString();
+    saveFallbackOrders();
     return order;
   },
 
@@ -372,6 +464,7 @@ export const Store = {
     const idx = memOrders.findIndex((o) => o._id.toString() === id.toString());
     if (idx === -1) return null;
     const removed = memOrders.splice(idx, 1);
+    saveFallbackOrders();
     return removed[0];
   },
 
@@ -432,6 +525,7 @@ export const Store = {
       updatedAt: new Date().toISOString(),
     };
     memExpenses.unshift(newExp);
+    saveFallbackExpenses();
     return newExp;
   },
 
@@ -442,6 +536,7 @@ export const Store = {
     const idx = memExpenses.findIndex((e) => e._id.toString() === id.toString());
     if (idx === -1) return null;
     const removed = memExpenses.splice(idx, 1);
+    saveFallbackExpenses();
     return removed[0];
   },
 

@@ -36,7 +36,7 @@ const loadFallbackUsers = () => {
     console.warn('Error reading fallback users file:', err.message);
   }
 
-  // Default initial admin
+  // Default initial users
   const salt = bcrypt.genSaltSync(10);
   const defaultAdmin = {
     _id: 'user_admin_master',
@@ -49,11 +49,24 @@ const loadFallbackUsers = () => {
     updatedAt: new Date().toISOString(),
   };
 
+  const defaultStaff = {
+    _id: 'user_riyas_staff',
+    name: 'Riyas',
+    username: 'riyas@lufo.com',
+    password: bcrypt.hashSync('Riyas@lufo3', salt),
+    role: 'staff',
+    isActive: true,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+
+  const initialUsers = [defaultAdmin, defaultStaff];
+
   try {
-    fs.writeFileSync(USERS_FILE, JSON.stringify([defaultAdmin], null, 2), 'utf8');
+    fs.writeFileSync(USERS_FILE, JSON.stringify(initialUsers, null, 2), 'utf8');
   } catch (e) {}
 
-  return [defaultAdmin];
+  return initialUsers;
 };
 
 let memUsers = loadFallbackUsers();

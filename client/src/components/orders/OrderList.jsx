@@ -4,7 +4,7 @@ import { api } from '../../services/api';
 import { OrderStatusBadge } from './OrderStatusBadge';
 import { EmptyState } from '../common/EmptyState';
 import { DateRangeFilter } from '../common/DateRangeFilter';
-import { Search, Eye, Trash2, Plus, ShoppingBag } from 'lucide-react';
+import { Search, Eye, Trash2, Plus, ShoppingBag, MessageSquare } from 'lucide-react';
 
 export const OrderList = () => {
   const { showToast, triggerRefresh, refreshKey, setIsCreateOrderOpen, setSelectedInvoiceOrder } = useApp();
@@ -219,15 +219,37 @@ export const OrderList = () => {
                     <td className="py-4 px-5 text-right">
                       <div className="flex items-center justify-end gap-1">
                         <button
+                          onClick={() => {
+                            let phone = (order.customer?.phone || '').replace(/\D/g, '').replace(/^0+/, '');
+                            if (phone.length === 10) phone = `91${phone}`;
+                            const itemsText = (order.items || [])
+                              .map(
+                                (it, idx) =>
+                                  `${idx + 1}. *${it.name}* (${it.size || 'M'}${it.color ? `, ${it.color}` : ''}) x ${it.quantity} = ₹${(it.total || 0).toLocaleString()}`
+                              )
+                              .join('\n');
+                            const msg = `*LUFO CLOTHING — INVOICE ${order.billNumber}*\nDate: ${new Date(order.orderDate || order.createdAt).toLocaleDateString()}\nCustomer: ${order.customer?.name || ''}\n\n*ITEMS:*\n${itemsText}\n\n*Total Amount:* ₹${(order.totalAmount || 0).toLocaleString()}\nStatus: ${order.status}\n\nThank you for choosing LUFO Clothing!`;
+                            const url = phone
+                              ? `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`
+                              : `https://wa.me/?text=${encodeURIComponent(msg)}`;
+                            window.open(url, '_blank');
+                            showToast(`Opening WhatsApp chat with ${order.customer?.name || 'Customer'}...`);
+                          }}
+                          className="p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-50 transition-colors"
+                          title="Share Invoice via WhatsApp"
+                        >
+                          <MessageSquare className="w-4 h-4" />
+                        </button>
+                        <button
                           onClick={() => setSelectedInvoiceOrder(order)}
-                          className="p-1.5 rounded-lg text-amber-700 hover:bg-amber-50"
+                          className="p-1.5 rounded-lg text-amber-700 hover:bg-amber-50 transition-colors"
                           title="View Bill"
                         >
                           <Eye className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => handleDelete(order._id, order.billNumber)}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
                           title="Delete"
                         >
                           <Trash2 className="w-4 h-4" />

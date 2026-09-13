@@ -105,19 +105,25 @@ ${itemsText}
     window.print();
   };
 
-  // 4. Share on WhatsApp
+  // 4. Share on WhatsApp directly to the customer's phone number
   const handleShareWhatsApp = () => {
-    const text = encodeURIComponent(generateReceiptText());
-    let phone = (order.customer?.phone || '').replace(/\D/g, '');
-    if (phone && phone.length === 10) {
-      phone = `91${phone}`;
+    const rawPhone = (order.customer?.phone || '').replace(/\D/g, '');
+    let cleanPhone = rawPhone.replace(/^0+/, '');
+    if (cleanPhone.length === 10) {
+      cleanPhone = `91${cleanPhone}`;
     }
-    const url = phone
-      ? `https://api.whatsapp.com/send?phone=${phone}&text=${text}`
-      : `https://api.whatsapp.com/send?text=${text}`;
 
+    const text = encodeURIComponent(generateReceiptText());
+
+    if (!cleanPhone) {
+      showToast('No customer phone number available', 'warning');
+      window.open(`https://wa.me/?text=${text}`, '_blank');
+      return;
+    }
+
+    const url = `https://wa.me/${cleanPhone}?text=${text}`;
     window.open(url, '_blank');
-    showToast('Opening WhatsApp to share invoice...');
+    showToast(`Opening WhatsApp chat with ${order.customer?.name || 'Customer'} (${order.customer?.phone})...`);
   };
 
   // 5. Copy Text to Clipboard

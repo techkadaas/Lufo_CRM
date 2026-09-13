@@ -16,13 +16,29 @@ import {
   Users,
   RefreshCw,
   Sparkles,
+  Handshake,
+  Plus,
+  Search,
+  DollarSign,
+  TrendingUp,
+  Wallet,
+  Phone,
+  Mail,
+  ExternalLink,
+  FileText,
+  CreditCard,
+  Building2,
 } from 'lucide-react';
+import { CreatePartnerModal } from '../components/partners/CreatePartnerModal';
+import { AddPartnerIncomeModal } from '../components/partners/AddPartnerIncomeModal';
+import { PartnerLedgerModal } from '../components/partners/PartnerLedgerModal';
+import { EmptyState } from '../components/common/EmptyState';
 
 export const SettingsPage = () => {
   const { user, updateCurrentUser } = useAuth();
   const { showToast } = useApp();
 
-  const [activeTab, setActiveTab] = useState('profile'); // 'profile' | 'team'
+  const [activeTab, setActiveTab] = useState('profile'); // 'profile' | 'team' | 'partners'
 
   // Profile Form State
   const [profileName, setProfileName] = useState(user?.name || '');
@@ -48,7 +64,175 @@ export const SettingsPage = () => {
   const [showMemberPass, setShowMemberPass] = useState(false);
   const [modalLoading, setModalLoading] = useState(false);
 
+  // Partner Management State (for Admins)
+  const [partners, setPartners] = useState(() => {
+    try {
+      const saved = localStorage.getItem('lufo_crm_all_partners');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return parsed.filter(
+          (p) =>
+            !['ptn-1', 'ptn-2', 'ptn-3'].includes(p.id) &&
+            !['Rahul Sharma', 'Vikramaditya Verma', 'Priya Nambiar'].includes(p.name)
+        );
+      }
+      return [];
+    } catch {
+      return [];
+    }
+  });
+
+  const [incomes, setIncomes] = useState(() => {
+    try {
+      const saved = localStorage.getItem('lufo_crm_partner_incomes');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return parsed.filter(
+          (i) =>
+            !['inc-1', 'inc-2', 'inc-3', 'inc-4', 'inc-5'].includes(i.id) &&
+            !['ptn-1', 'ptn-2', 'ptn-3'].includes(i.partnerId)
+        );
+      }
+      return [];
+    } catch {
+      return [];
+    }
+  });
+
+  // Partner Modals & Search State
+  const [isAddPartnerOpen, setIsAddPartnerOpen] = useState(false);
+  const [editingPartner, setEditingPartner] = useState(null);
+  const [isAddIncomeOpen, setIsAddIncomeOpen] = useState(false);
+  const [selectedPartnerForIncome, setSelectedPartnerForIncome] = useState(null);
+  const [selectedPartnerForLedger, setSelectedPartnerForLedger] = useState(null);
+  const [partnerSearch, setPartnerSearch] = useState('');
+  const [partnerStatusFilter, setPartnerStatusFilter] = useState('All');
+
   const isAdmin = user?.role === 'admin';
+
+  // Cross-component sync for partners & incomes
+  useEffect(() => {
+    const handleSync = () => {
+      try {
+        const savedP = localStorage.getItem('lufo_crm_all_partners');
+        if (savedP) setPartners(JSON.parse(savedP));
+        const savedI = localStorage.getItem('lufo_crm_partner_incomes');
+        if (savedI) setIncomes(JSON.parse(savedI));
+      } catch (e) {
+        console.error('Error syncing partners data in settings:', e);
+      }
+    };
+    window.addEventListener('lufo_partners_updated', handleSync);
+    window.addEventListener('storage', handleSync);
+    return () => {
+      window.removeEventListener('lufo_partners_updated', handleSync);
+      window.removeEventListener('storage', handleSync);
+    };
+  }, []);
+
+  const savePartnersToStorage = (updatedPartners) => {
+    setPartners(updatedPartners);
+    localStorage.setItem('lufo_crm_all_partners', JSON.stringify(updatedPartners));
+    window.dispatchEvent(new CustomEvent('lufo_partners_updated'));
+  };
+
+  const saveIncomesToStorage = (updatedIncomes) => {
+    setIncomes(updatedIncomes);
+    localStorage.setItem('lufo_crm_partner_incomes', JSON.stringify(updatedIncomes));
+    window.dispatchEvent(new CustomEvent('lufo_partners_updated'));
+  };
+
+  // Partner Handlers
+  const handleSavePartner = (partnerData) => {
+    if (editingPartner) {
+      const updated = partners.map((p) =>
+        p.id === editingPartner.id ? { ...p, ...partnerData } : p
+      );
+      savePartnersToStorage(updated);
+      showToast('Partner details updated successfully', 'success');
+    } else {
+      const newPartner = {
+        id: `ptn-${Date.now()}`,
+        createdAt: new Date().toISOString(),
+        ...partnerData,
+      };
+      const updated = [...partners, newPartner];
+      savePartnersToStorage(updated);
+      showToast(`Partner "${partnerData.name}" added successfully`, 'success');
+    }
+    setEditingPartner(null);
+    setIsAddPartnerOpen(false);
+  };
+
+  const handleDeletePartner = (id, name) => {
+    if (
+      !window.confirm(
+        `Are you sure you want to remove partner "${name}"? This will also remove their recorded capital/income entries.`
+      )
+    )
+      return;
+
+    const updatedPartners = partners.filter((p) => p.id !== id);
+    const updatedIncomes = incomes.filter((i) => i.partnerId !== id);
+    savePartnersToStorage(updatedPartners);
+    saveIncomesToStorage(updatedIncomes);
+    showToast(`Partner "${name}" and their records removed`, 'success');
+  };
+
+  const handleSaveIncome = (incomeData) => {
+    const newIncome = {
+      id: `inc-${Date.now()}`,
+      ...incomeData,
+    };
+    const updated = [newIncome, ...incomes];
+    saveIncomesToStorage(updated);
+
+    const p = partners.find((x) => x.id === incomeData.partnerId);
+    showToast(
+      `Recorded ₹${Number(incomeData.amount).toLocaleString()} from ${p ? p.name : 'Partner'}`,
+      'success'
+    );
+  };
+
+  const handleDeleteIncome = (id, amount) => {
+    if (!window.confirm(`Delete income record of ₹${(amount || 0).toLocaleString()}?`)) return;
+    const updated = incomes.filter((i) => i.id !== id);
+    saveIncomesToStorage(updated);
+    showToast('Income entry deleted', 'success');
+  };
+
+  // Calculate stats for partner cards
+  const totalPartnerCapital = incomes.reduce((sum, i) => sum + (Number(i.amount) || 0), 0);
+
+  const partnersWithStats = partners.map((p) => {
+    const partnerIncomes = incomes.filter((i) => i.partnerId === p.id);
+    const totalAmount = partnerIncomes.reduce((sum, i) => sum + (Number(i.amount) || 0), 0);
+    const sharePercent =
+      totalPartnerCapital > 0 ? ((totalAmount / totalPartnerCapital) * 100).toFixed(1) : 0;
+    const lastIncome = partnerIncomes.sort((a, b) => new Date(b.date) - new Date(a.date))[0];
+
+    return {
+      ...p,
+      totalMoney: totalAmount,
+      sharePercent: Number(sharePercent),
+      entriesCount: partnerIncomes.length,
+      lastIncomeDate: lastIncome ? lastIncome.date : null,
+      lastIncomeAmount: lastIncome ? lastIncome.amount : null,
+    };
+  });
+
+  const filteredPartners = partnersWithStats.filter((p) => {
+    const matchesSearch =
+      p.name.toLowerCase().includes(partnerSearch.toLowerCase()) ||
+      (p.role && p.role.toLowerCase().includes(partnerSearch.toLowerCase())) ||
+      (p.phone && p.phone.toLowerCase().includes(partnerSearch.toLowerCase())) ||
+      (p.email && p.email.toLowerCase().includes(partnerSearch.toLowerCase()));
+
+    const matchesStatus =
+      partnerStatusFilter === 'All' || p.status === partnerStatusFilter;
+
+    return matchesSearch && matchesStatus;
+  });
 
   // Load team users if Admin
   const fetchUsers = async () => {
@@ -158,7 +342,6 @@ export const SettingsPage = () => {
     try {
       setModalLoading(true);
       if (editingUser) {
-        // Update
         const payload = {
           name: memberName.trim(),
           username: memberUsername.trim(),
@@ -171,7 +354,6 @@ export const SettingsPage = () => {
           fetchUsers();
         }
       } else {
-        // Create
         const res = await api.createUser({
           name: memberName.trim(),
           username: memberUsername.trim(),
@@ -207,6 +389,15 @@ export const SettingsPage = () => {
     }
   };
 
+  const distinctGradients = [
+    'from-amber-500 to-amber-700',
+    'from-emerald-500 to-emerald-700',
+    'from-indigo-500 to-indigo-700',
+    'from-rose-500 to-rose-700',
+    'from-sky-500 to-sky-700',
+    'from-purple-500 to-purple-700',
+  ];
+
   return (
     <div className="space-y-6">
       {/* Header Banner */}
@@ -214,15 +405,15 @@ export const SettingsPage = () => {
         <div>
           <h2 className="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2.5">
             <Shield className="w-5 h-5 text-amber-600" />
-            <span>Account & Access Management</span>
+            <span>Settings & Access Control</span>
           </h2>
           <p className="text-xs text-slate-500 mt-1">
-            Manage your credentials, update your password, and administer team login credentials.
+            Manage your credentials, team member accounts, and business partner configurations.
           </p>
         </div>
 
         {/* Tab Switcher */}
-        <div className="flex bg-slate-100/80 p-1 rounded-xl shrink-0 self-start md:self-auto">
+        <div className="flex flex-wrap bg-slate-100/80 p-1 rounded-xl gap-1 shrink-0 self-start md:self-auto">
           <button
             onClick={() => setActiveTab('profile')}
             className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 ${
@@ -246,6 +437,20 @@ export const SettingsPage = () => {
             >
               <Users className="w-3.5 h-3.5" />
               <span>Team Accounts ({teamStats.staffCount}/3)</span>
+            </button>
+          )}
+
+          {isAdmin && (
+            <button
+              onClick={() => setActiveTab('partners')}
+              className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 ${
+                activeTab === 'partners'
+                  ? 'bg-white text-slate-900 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Handshake className="w-3.5 h-3.5" />
+              <span>Partners Management ({partners.length})</span>
             </button>
           )}
         </div>
@@ -406,7 +611,7 @@ export const SettingsPage = () => {
                 <button
                   type="submit"
                   disabled={profileLoading}
-                  className="bg-amber-600 hover:bg-amber-700 text-white px-6 py-2.5 rounded-xl font-semibold text-xs tracking-wide transition-all shadow-sm flex items-center gap-2 disabled:opacity-60"
+                  className="bg-amber-600 hover:bg-amber-700 text-white px-6 py-2.5 rounded-xl font-semibold text-xs tracking-wide transition-all shadow-sm flex items-center gap-2 disabled:opacity-60 cursor-pointer"
                 >
                   {profileLoading ? (
                     <RefreshCw className="w-4 h-4 animate-spin" />
@@ -443,7 +648,7 @@ export const SettingsPage = () => {
                 <button
                   onClick={openCreateModal}
                   disabled={teamStats.staffCount >= 3}
-                  className="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-xl text-xs font-semibold transition-all shadow-sm flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-xl text-xs font-semibold transition-all shadow-sm flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
                 >
                   <UserPlus className="w-3.5 h-3.5" />
                   <span>Add Team Account</span>
@@ -496,7 +701,7 @@ export const SettingsPage = () => {
               <button
                 onClick={fetchUsers}
                 disabled={loadingUsers}
-                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-50 transition-colors"
+                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer"
                 title="Refresh user list"
               >
                 <RefreshCw className={`w-4 h-4 ${loadingUsers ? 'animate-spin text-amber-600' : ''}`} />
@@ -556,14 +761,14 @@ export const SettingsPage = () => {
                             <div className="flex items-center justify-end gap-1.5">
                               <button
                                 onClick={() => openEditModal(u)}
-                                className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors"
+                                className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
                                 title="Edit or Reset Password"
                               >
                                 <Edit2 className="w-3.5 h-3.5" />
                               </button>
                               <button
                                 onClick={() => handleDeleteUser(u._id, u.name)}
-                                className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors"
+                                className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
                                 title="Delete User (Free slot)"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
@@ -581,7 +786,311 @@ export const SettingsPage = () => {
         </div>
       )}
 
-      {/* Add / Edit User Modal */}
+      {/* Tab 3: Partner Accounts & Business Stakeholders */}
+      {activeTab === 'partners' && isAdmin && (
+        <div className="space-y-6">
+          {/* Top KPI & Controls Header */}
+          <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <h3 className="font-bold text-slate-900 text-base flex items-center gap-2">
+                <Handshake className="w-4 h-4 text-amber-600" />
+                <span>Business Partners & Capital Stakeholders</span>
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Add, configure, and manage business partners who contribute capital/funds for purchases and stock inventory.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => {
+                  setEditingPartner(null);
+                  setIsAddPartnerOpen(true);
+                }}
+                className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2.5 rounded-xl text-xs font-semibold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Add New Partner</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Partner KPIs Summary Bar */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="p-4 rounded-2xl bg-white border border-slate-100 shadow-xs flex items-center justify-between">
+              <div>
+                <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
+                  Total Partners
+                </span>
+                <span className="text-2xl font-bold font-mono text-slate-900 mt-1 block">
+                  {partners.length}
+                </span>
+                <span className="text-[11px] text-slate-500">
+                  {partners.filter((p) => p.status === 'Active').length} Active • {partners.filter((p) => p.status === 'Inactive').length} Inactive
+                </span>
+              </div>
+              <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+                <Users className="w-5 h-5" />
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-white border border-slate-100 shadow-xs flex items-center justify-between">
+              <div>
+                <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
+                  Total Capital Put In
+                </span>
+                <span className="text-2xl font-bold font-mono text-slate-900 mt-1 block">
+                  ₹{totalPartnerCapital.toLocaleString()}
+                </span>
+                <span className="text-[11px] text-emerald-600 font-medium flex items-center gap-1">
+                  <TrendingUp className="w-3 h-3" />
+                  {incomes.length} Capital Inflow Entries
+                </span>
+              </div>
+              <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                <DollarSign className="w-5 h-5" />
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-white border border-slate-100 shadow-xs flex items-center justify-between">
+              <div>
+                <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
+                  Quick Actions
+                </span>
+                <div className="flex items-center gap-2 mt-2">
+                  <button
+                    onClick={() => {
+                      if (partners.length === 0) {
+                        showToast('Please add a partner first before adding capital', 'error');
+                        return;
+                      }
+                      setSelectedPartnerForIncome(partners[0].id);
+                      setIsAddIncomeOpen(true);
+                    }}
+                    className="px-2.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add Capital</span>
+                  </button>
+                  <a
+                    href="#partners"
+                    className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    <span>View Ledger</span>
+                  </a>
+                </div>
+              </div>
+              <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                <Wallet className="w-5 h-5" />
+              </div>
+            </div>
+          </div>
+
+          {/* Search and Filters Bar */}
+          <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div className="relative w-full sm:w-80">
+              <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={partnerSearch}
+                onChange={(e) => setPartnerSearch(e.target.value)}
+                placeholder="Search by name, role, phone, or email..."
+                className="w-full pl-9 pr-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:bg-white focus:outline-none focus:border-amber-500 transition-all"
+              />
+            </div>
+
+            <div className="flex items-center gap-2 self-start sm:self-auto">
+              <span className="text-xs text-slate-400 font-medium">Status:</span>
+              <div className="flex bg-slate-100/80 p-1 rounded-xl gap-1">
+                {['All', 'Active', 'Inactive'].map((st) => (
+                  <button
+                    key={st}
+                    onClick={() => setPartnerStatusFilter(st)}
+                    className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${
+                      partnerStatusFilter === st
+                        ? 'bg-white text-slate-900 shadow-xs font-semibold'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    {st}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Partner Cards List */}
+          {filteredPartners.length === 0 ? (
+            <div className="bg-white rounded-2xl p-8 border border-slate-100 shadow-xs">
+              <EmptyState
+                icon={Handshake}
+                title={partnerSearch ? 'No matching partners found' : 'No Business Partners Added Yet'}
+                description={
+                  partnerSearch
+                    ? `No partners matched your search "${partnerSearch}". Try adjusting your filters.`
+                    : 'Add partners to record their business capital contributions and manage partner shares.'
+                }
+                actionLabel={partnerSearch ? 'Clear Search' : 'Add First Partner'}
+                onAction={
+                  partnerSearch
+                    ? () => setPartnerSearch('')
+                    : () => {
+                        setEditingPartner(null);
+                        setIsAddPartnerOpen(true);
+                      }
+                }
+              />
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredPartners.map((partner, idx) => {
+                const gradient = distinctGradients[idx % distinctGradients.length];
+                return (
+                  <div
+                    key={partner.id}
+                    className="bg-white rounded-2xl p-5 border border-slate-100 shadow-xs hover:border-amber-200 hover:shadow-md transition-all flex flex-col justify-between group"
+                  >
+                    <div>
+                      {/* Top Row: Avatar & Status & Actions */}
+                      <div className="flex items-start justify-between gap-3 mb-3">
+                        <div className="flex items-center gap-3">
+                          <div
+                            className={`w-11 h-11 rounded-2xl bg-gradient-to-br ${gradient} text-white font-bold text-sm flex items-center justify-center shadow-xs shrink-0`}
+                          >
+                            {partner.name
+                              .split(' ')
+                              .map((n) => n[0])
+                              .join('')
+                              .slice(0, 2)
+                              .toUpperCase()}
+                          </div>
+                          <div>
+                            <h4 className="font-bold text-slate-900 text-sm group-hover:text-amber-700 transition-colors">
+                              {partner.name}
+                            </h4>
+                            <span className="text-[11px] text-slate-500 font-medium block">
+                              {partner.role || 'Business Partner'}
+                            </span>
+                          </div>
+                        </div>
+
+                        <span
+                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold tracking-wider uppercase ${
+                            partner.status === 'Active'
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                              : 'bg-slate-100 text-slate-600 border border-slate-200'
+                          }`}
+                        >
+                          {partner.status || 'Active'}
+                        </span>
+                      </div>
+
+                      {/* Contact Info */}
+                      <div className="space-y-1.5 py-2 text-xs text-slate-600 border-t border-slate-50">
+                        {partner.phone && (
+                          <div className="flex items-center gap-2">
+                            <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                            <a
+                              href={`tel:${partner.phone}`}
+                              className="hover:text-amber-600 transition-colors font-mono text-[11px]"
+                            >
+                              {partner.phone}
+                            </a>
+                          </div>
+                        )}
+                        {partner.email && (
+                          <div className="flex items-center gap-2">
+                            <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                            <a
+                              href={`mailto:${partner.email}`}
+                              className="hover:text-amber-600 transition-colors text-[11px] truncate"
+                            >
+                              {partner.email}
+                            </a>
+                          </div>
+                        )}
+                        {partner.notes && (
+                          <p className="text-[11px] text-slate-500 italic line-clamp-2 pt-1">
+                            "{partner.notes}"
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Financial / Capital summary */}
+                      <div className="mt-3 p-3 rounded-xl bg-slate-50/80 border border-slate-100 flex items-center justify-between">
+                        <div>
+                          <span className="text-[10px] font-semibold uppercase text-slate-400 block">
+                            Capital Contributed
+                          </span>
+                          <span className="text-base font-bold font-mono text-slate-900">
+                            ₹{partner.totalMoney.toLocaleString()}
+                          </span>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-[10px] font-semibold uppercase text-slate-400 block">
+                            Total Inflows
+                          </span>
+                          <span className="text-xs font-semibold text-amber-700">
+                            {partner.entriesCount} Deposits
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Action Buttons Row */}
+                    <div className="pt-4 mt-4 border-t border-slate-100 flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => {
+                            setSelectedPartnerForIncome(partner.id);
+                            setIsAddIncomeOpen(true);
+                          }}
+                          className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer"
+                          title="Record new capital inflow from this partner"
+                        >
+                          <Plus className="w-3.5 h-3.5 text-amber-600" />
+                          <span>+ Money</span>
+                        </button>
+                        <button
+                          onClick={() => setSelectedPartnerForLedger(partner)}
+                          className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-medium flex items-center gap-1 transition-colors cursor-pointer"
+                          title="View Capital statement and ledger"
+                        >
+                          <FileText className="w-3.5 h-3.5" />
+                          <span>Ledger</span>
+                        </button>
+                      </div>
+
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => {
+                            setEditingPartner(partner);
+                            setIsAddPartnerOpen(true);
+                          }}
+                          className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                          title="Edit Partner"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleDeletePartner(partner.id, partner.name)}
+                          className="p-1.5 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                          title="Delete Partner"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Add / Edit Team User Modal */}
       {isAddUserModalOpen && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-100 animate-in fade-in zoom-in-95 duration-150">
@@ -591,7 +1100,7 @@ export const SettingsPage = () => {
               </h3>
               <button
                 onClick={() => setIsAddUserModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 text-lg leading-none"
+                className="text-slate-400 hover:text-slate-600 text-lg leading-none cursor-pointer"
               >
                 &times;
               </button>
@@ -642,7 +1151,7 @@ export const SettingsPage = () => {
                   <button
                     type="button"
                     onClick={() => setShowMemberPass(!showMemberPass)}
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600"
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 cursor-pointer"
                   >
                     {showMemberPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
@@ -653,14 +1162,14 @@ export const SettingsPage = () => {
                 <button
                   type="button"
                   onClick={() => setIsAddUserModalOpen(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={modalLoading}
-                  className="bg-amber-600 hover:bg-amber-700 text-white px-5 py-2 rounded-xl text-xs font-semibold tracking-wide transition-all shadow-sm flex items-center gap-1.5 disabled:opacity-60"
+                  className="bg-amber-600 hover:bg-amber-700 text-white px-5 py-2 rounded-xl text-xs font-semibold tracking-wide transition-all shadow-sm flex items-center gap-1.5 disabled:opacity-60 cursor-pointer"
                 >
                   {modalLoading && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
                   <span>{editingUser ? 'Save Changes' : 'Create Account'}</span>
@@ -669,6 +1178,49 @@ export const SettingsPage = () => {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Add / Edit Partner Modal */}
+      {isAddPartnerOpen && (
+        <CreatePartnerModal
+          isOpen={isAddPartnerOpen}
+          onClose={() => {
+            setIsAddPartnerOpen(false);
+            setEditingPartner(null);
+          }}
+          onSave={handleSavePartner}
+          editingPartner={editingPartner}
+        />
+      )}
+
+      {/* Add Partner Income / Capital Modal */}
+      {isAddIncomeOpen && (
+        <AddPartnerIncomeModal
+          isOpen={isAddIncomeOpen}
+          onClose={() => {
+            setIsAddIncomeOpen(false);
+            setSelectedPartnerForIncome(null);
+          }}
+          partners={partners}
+          defaultPartnerId={selectedPartnerForIncome}
+          onSaveIncome={handleSaveIncome}
+        />
+      )}
+
+      {/* Partner Ledger Modal */}
+      {selectedPartnerForLedger && (
+        <PartnerLedgerModal
+          isOpen={!!selectedPartnerForLedger}
+          onClose={() => setSelectedPartnerForLedger(null)}
+          partner={selectedPartnerForLedger}
+          contributions={incomes}
+          onDeleteContribution={handleDeleteIncome}
+          onAddMoreMoney={(partnerId) => {
+            setSelectedPartnerForLedger(null);
+            setSelectedPartnerForIncome(partnerId);
+            setIsAddIncomeOpen(true);
+          }}
+        />
       )}
     </div>
   );

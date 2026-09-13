@@ -74,11 +74,33 @@ export const PartnersView = () => {
 
   useEffect(() => {
     localStorage.setItem('lufo_crm_all_partners', JSON.stringify(partners));
+    window.dispatchEvent(new CustomEvent('lufo_partners_updated'));
   }, [partners]);
 
   useEffect(() => {
     localStorage.setItem('lufo_crm_partner_incomes', JSON.stringify(incomes));
+    window.dispatchEvent(new CustomEvent('lufo_partners_updated'));
   }, [incomes]);
+
+  // Listen to external updates (e.g., from Settings page)
+  useEffect(() => {
+    const handleSync = () => {
+      try {
+        const savedP = localStorage.getItem('lufo_crm_all_partners');
+        if (savedP) setPartners(JSON.parse(savedP));
+        const savedI = localStorage.getItem('lufo_crm_partner_incomes');
+        if (savedI) setIncomes(JSON.parse(savedI));
+      } catch (e) {
+        console.error('Error syncing partners data:', e);
+      }
+    };
+    window.addEventListener('lufo_partners_updated', handleSync);
+    window.addEventListener('storage', handleSync);
+    return () => {
+      window.removeEventListener('lufo_partners_updated', handleSync);
+      window.removeEventListener('storage', handleSync);
+    };
+  }, []);
 
   // Modal states
   const [isAddPartnerOpen, setIsAddPartnerOpen] = useState(false);

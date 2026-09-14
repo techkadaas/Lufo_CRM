@@ -1,12 +1,10 @@
 import { Order } from '../models/Order.js';
 
-let mockCounter = 0;
+let fallbackCounter = 0;
 
 export const generateBillNumber = async () => {
-  const prefix = 'LF';
-
   try {
-    // Find all existing order bill numbers to accurately find the max sequence
+    // Find all existing order numbers to accurately find the max sequence
     const orders = await Order.find({}, { billNumber: 1 }).lean();
 
     let maxSequence = 0;
@@ -14,10 +12,12 @@ export const generateBillNumber = async () => {
     if (orders && orders.length > 0) {
       for (const ord of orders) {
         if (ord.billNumber) {
-          const parts = ord.billNumber.split('-');
-          const seq = parseInt(parts[parts.length - 1], 10);
-          if (!isNaN(seq) && seq > maxSequence) {
-            maxSequence = seq;
+          const match = String(ord.billNumber).match(/\d+/g);
+          if (match) {
+            const seq = parseInt(match[match.length - 1], 10);
+            if (!isNaN(seq) && seq > maxSequence) {
+              maxSequence = seq;
+            }
           }
         }
       }
@@ -25,17 +25,17 @@ export const generateBillNumber = async () => {
 
     let candidateSeq = maxSequence + 1;
     const formatSeq = (num) => String(num).padStart(2, '0');
-    let candidateBillNumber = `${prefix}-${formatSeq(candidateSeq)}`;
+    let candidateNumber = formatSeq(candidateSeq);
 
     // Safety check against any race condition or duplicate
-    while (await Order.exists({ billNumber: candidateBillNumber })) {
+    while (await Order.exists({ billNumber: candidateNumber })) {
       candidateSeq += 1;
-      candidateBillNumber = `${prefix}-${formatSeq(candidateSeq)}`;
+      candidateNumber = formatSeq(candidateSeq);
     }
 
-    return candidateBillNumber;
+    return candidateNumber;
   } catch (error) {
-    mockCounter += 1;
-    return `${prefix}-${String(mockCounter).padStart(2, '0')}`;
+    fallbackCounter += 1;
+    return String(fallbackCounter).padStart(2, '0');
   }
 };

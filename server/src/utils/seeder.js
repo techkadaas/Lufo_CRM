@@ -58,6 +58,34 @@ export const seedDatabase = async () => {
       });
       console.log('Staff account (riyas@lufo.com) created successfully.');
     }
+
+    // Seed staff user arapsa@lufo.com if not exists
+    const arapsaUser = await User.findOne({ username: 'arapsa@lufo.com' });
+    if (!arapsaUser) {
+      console.log('Seeding staff account (arapsa@lufo.com)...');
+      await User.create({
+        name: 'Arapsa',
+        username: 'arapsa@lufo.com',
+        password: 'Arapsa@lufo2',
+        role: 'staff',
+        isActive: true,
+      });
+      console.log('Staff account (arapsa@lufo.com) created successfully.');
+    }
+
+    // Seed staff user najeer@lufo.com if not exists
+    const najeerUser = await User.findOne({ username: 'najeer@lufo.com' });
+    if (!najeerUser) {
+      console.log('Seeding staff account (najeer@lufo.com)...');
+      await User.create({
+        name: 'Najeer',
+        username: 'najeer@lufo.com',
+        password: 'Najeer@lufo4',
+        role: 'staff',
+        isActive: true,
+      });
+      console.log('Staff account (najeer@lufo.com) created successfully.');
+    }
   } catch (err) {
     console.warn(`Clean database / seed notice: ${err.message}`);
   }

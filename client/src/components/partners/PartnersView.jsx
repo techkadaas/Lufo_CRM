@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useApp } from '../../context/AppContext';
+import { api } from '../../services/api';
 import {
   Handshake,
   Plus,
@@ -21,86 +22,103 @@ import {
   Mail,
   Receipt,
   Eye,
+  Loader2,
 } from 'lucide-react';
 import { CreatePartnerModal } from './CreatePartnerModal';
 import { AddPartnerIncomeModal } from './AddPartnerIncomeModal';
 import { PartnerLedgerModal } from './PartnerLedgerModal';
 import { EmptyState } from '../common/EmptyState';
 
-const DEFAULT_PARTNERS = [];
-const DEFAULT_INCOMES = [];
-
 export const PartnersView = () => {
   const { showToast } = useApp();
 
   // Active view tab: 'summary' (Partner Cards & Contributions) | 'ledger' (All Transactions History)
   const [activeTab, setActiveTab] = useState('summary');
+  const [loading, setLoading] = useState(true);
 
-  // Partners data stored in localStorage (cleared of legacy dummy data)
-  const [partners, setPartners] = useState(() => {
+  const [partners, setPartners] = useState([]);
+  const [incomes, setIncomes] = useState([]);
+
+  // Fetch partners and partner incomes from server
+  const fetchPartnersAndIncomes = useCallback(async () => {
     try {
-      const saved = localStorage.getItem('lufo_crm_all_partners');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        return parsed.filter(
-          (p) =>
-            !['ptn-1', 'ptn-2', 'ptn-3'].includes(p.id) &&
-            !['Rahul Sharma', 'Vikramaditya Verma', 'Priya Nambiar'].includes(p.name)
-        );
-      }
-      return DEFAULT_PARTNERS;
-    } catch {
-      return DEFAULT_PARTNERS;
-    }
-  });
+      setLoading(true);
+      const [partnersRes, incomesRes] = await Promise.all([
+        api.getPartners(),
+        api.getPartnerIncomes(),
+      ]);
 
-  // Partner Incomes / Capital Contributions (cleared of legacy dummy data)
-  const [incomes, setIncomes] = useState(() => {
-    try {
-      const saved = localStorage.getItem('lufo_crm_partner_incomes');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        return parsed.filter(
-          (i) =>
-            !['inc-1', 'inc-2', 'inc-3', 'inc-4', 'inc-5'].includes(i.id) &&
-            !['ptn-1', 'ptn-2', 'ptn-3'].includes(i.partnerId)
-        );
-      }
-      return DEFAULT_INCOMES;
-    } catch {
-      return DEFAULT_INCOMES;
-    }
-  });
+      let serverPartners = partnersRes.success ? (partnersRes.data || []) : [];
+      let serverIncomes = incomesRes.success ? (incomesRes.data || []) : [];
 
-  useEffect(() => {
-    localStorage.setItem('lufo_crm_all_partners', JSON.stringify(partners));
-    window.dispatchEvent(new CustomEvent('lufo_partners_updated'));
-  }, [partners]);
+      // Normalize IDs
+      serverPartners = serverPartners.map((p) => ({ ...p, id: p._id || p.id, _id: p._id || p.id }));
+      serverIncomes = serverIncomes.map((i) => ({ ...i, id: i._id || i.id, _id: i._id || i.id }));
 
-  useEffect(() => {
-    localStorage.setItem('lufo_crm_partner_incomes', JSON.stringify(incomes));
-    window.dispatchEvent(new CustomEvent('lufo_partners_updated'));
-  }, [incomes]);
-
-  // Listen to external updates (e.g., from Settings page)
-  useEffect(() => {
-    const handleSync = () => {
+      // Seamless migration: If server has no partners, check if localStorage had previous data and sync it to server
       try {
-        const savedP = localStorage.getItem('lufo_crm_all_partners');
-        if (savedP) setPartners(JSON.parse(savedP));
-        const savedI = localStorage.getItem('lufo_crm_partner_incomes');
-        if (savedI) setIncomes(JSON.parse(savedI));
-      } catch (e) {
-        console.error('Error syncing partners data:', e);
+        const localP = JSON.parse(localStorage.getItem('lufo_crm_all_partners') || '[]');
+        const localI = JSON.parse(localStorage.getItem('lufo_crm_partner_incomes') || '[]');
+        
+        if (serverPartners.length === 0 && localP.length > 0) {
+          const partnerIdMap = {};
+          for (const p of localP) {
+            if (['ptn-1', 'ptn-2', 'ptn-3'].includes(p.id)) continue;
+            try {
+              const res = await api.createPartner({
+                name: p.name,
+                phone: p.phone || '',
+                email: p.email || '',
+                role: p.role || 'Partner',
+                status: p.status || 'Active',
+                notes: p.notes || '',
+              });
+              if (res.success && res.data) {
+                const newId = res.data._id || res.data.id;
+                partnerIdMap[p.id] = newId;
+                serverPartners.push({ ...res.data, id: newId, _id: newId });
+              }
+            } catch (e) {}
+          }
+
+          if (serverIncomes.length === 0 && localI.length > 0) {
+            for (const inc of localI) {
+              if (['inc-1', 'inc-2', 'inc-3', 'inc-4', 'inc-5'].includes(inc.id)) continue;
+              const mappedPartnerId = partnerIdMap[inc.partnerId] || inc.partnerId;
+              try {
+                const res = await api.createPartnerIncome({
+                  partnerId: mappedPartnerId,
+                  amount: Number(inc.amount) || 0,
+                  date: inc.date || new Date().toISOString(),
+                  paymentMode: inc.paymentMode || 'UPI',
+                  purpose: inc.purpose || 'General Business Purchase / Capital Inflow',
+                  referenceNo: inc.referenceNo || '',
+                });
+                if (res.success && res.data) {
+                  const newIncId = res.data._id || res.data.id;
+                  serverIncomes.push({ ...res.data, id: newIncId, _id: newIncId });
+                }
+              } catch (e) {}
+            }
+          }
+        }
+      } catch (migrationErr) {
+        console.warn('Partner migration notice:', migrationErr);
       }
-    };
-    window.addEventListener('lufo_partners_updated', handleSync);
-    window.addEventListener('storage', handleSync);
-    return () => {
-      window.removeEventListener('lufo_partners_updated', handleSync);
-      window.removeEventListener('storage', handleSync);
-    };
-  }, []);
+
+      setPartners(serverPartners);
+      setIncomes(serverIncomes);
+    } catch (err) {
+      console.error('Failed to load partners data:', err);
+      showToast('Failed to load partners data from server', 'error');
+    } finally {
+      setLoading(false);
+    }
+  }, [showToast]);
+
+  useEffect(() => {
+    fetchPartnersAndIncomes();
+  }, [fetchPartnersAndIncomes]);
 
   // Modal states
   const [isAddPartnerOpen, setIsAddPartnerOpen] = useState(false);
@@ -117,24 +135,29 @@ export const PartnersView = () => {
   const [partnerFilterForIncome, setPartnerFilterForIncome] = useState('All');
 
   // --- Handlers for Partner Management ---
-  const handleSavePartner = (partnerData) => {
-    if (editingPartner) {
-      setPartners((prev) =>
-        prev.map((item) => (item.id === editingPartner.id ? { ...item, ...partnerData } : item))
-      );
-      showToast('Partner details updated successfully');
-    } else {
-      const newPartner = {
-        id: `ptn-${Date.now()}`,
-        ...partnerData,
-      };
-      setPartners((prev) => [...prev, newPartner]);
-      showToast('New partner added successfully');
+  const handleSavePartner = async (partnerData) => {
+    try {
+      if (editingPartner) {
+        const id = editingPartner.id || editingPartner._id;
+        const res = await api.updatePartner(id, partnerData);
+        if (res.success) {
+          showToast('Partner details updated successfully');
+          fetchPartnersAndIncomes();
+        }
+      } else {
+        const res = await api.createPartner(partnerData);
+        if (res.success) {
+          showToast('New partner added successfully');
+          fetchPartnersAndIncomes();
+        }
+      }
+    } catch (err) {
+      showToast(err.message || 'Failed to save partner', 'error');
     }
     setEditingPartner(null);
   };
 
-  const handleDeletePartner = (id, name) => {
+  const handleDeletePartner = async (id, name) => {
     if (
       !window.confirm(
         `Are you sure you want to remove partner "${name}"? This will also remove their recorded income entries.`
@@ -142,29 +165,44 @@ export const PartnersView = () => {
     )
       return;
 
-    setPartners((prev) => prev.filter((p) => p.id !== id));
-    setIncomes((prev) => prev.filter((i) => i.partnerId !== id));
-    showToast(`Partner "${name}" and their records removed`);
+    try {
+      const res = await api.deletePartner(id);
+      if (res.success) {
+        showToast(`Partner "${name}" and their records removed`);
+        fetchPartnersAndIncomes();
+      }
+    } catch (err) {
+      showToast(err.message || 'Failed to delete partner', 'error');
+    }
   };
 
   // --- Handlers for Income / Capital Contribution Entries ---
-  const handleSaveIncome = (incomeData) => {
-    const newIncome = {
-      id: `inc-${Date.now()}`,
-      ...incomeData,
-    };
-    setIncomes((prev) => [newIncome, ...prev]);
-
-    const partner = partners.find((p) => p.id === incomeData.partnerId);
-    showToast(
-      `Recorded ₹${incomeData.amount.toLocaleString()} from ${partner ? partner.name : 'Partner'}`
-    );
+  const handleSaveIncome = async (incomeData) => {
+    try {
+      const res = await api.createPartnerIncome(incomeData);
+      if (res.success) {
+        const partner = partners.find((p) => (p.id || p._id)?.toString() === (incomeData.partnerId)?.toString());
+        showToast(
+          `Recorded ₹${Number(incomeData.amount).toLocaleString()} from ${partner ? partner.name : 'Partner'}`
+        );
+        fetchPartnersAndIncomes();
+      }
+    } catch (err) {
+      showToast(err.message || 'Failed to record income', 'error');
+    }
   };
 
-  const handleDeleteIncome = (id, amount) => {
+  const handleDeleteIncome = async (id, amount) => {
     if (!window.confirm(`Delete income record of ₹${(amount || 0).toLocaleString()}?`)) return;
-    setIncomes((prev) => prev.filter((i) => i.id !== id));
-    showToast('Income entry deleted');
+    try {
+      const res = await api.deletePartnerIncome(id);
+      if (res.success) {
+        showToast('Income entry deleted');
+        fetchPartnersAndIncomes();
+      }
+    } catch (err) {
+      showToast(err.message || 'Failed to delete income entry', 'error');
+    }
   };
 
   // --- Calculations ---
@@ -172,18 +210,21 @@ export const PartnersView = () => {
 
   // Calculate each partner's total money put in
   const partnersWithStats = partners.map((p) => {
-    const partnerIncomes = incomes.filter((i) => i.partnerId === p.id);
+    const pId = (p.id || p._id)?.toString();
+    const partnerIncomes = incomes.filter((i) => (i.partnerId || '').toString() === pId);
     const totalAmount = partnerIncomes.reduce((sum, i) => sum + (Number(i.amount) || 0), 0);
     const sharePercent =
       totalMoneyContributed > 0 ? ((totalAmount / totalMoneyContributed) * 100).toFixed(1) : 0;
-    const lastIncome = partnerIncomes.sort((a, b) => new Date(b.date) - new Date(a.date))[0];
+    const lastIncome = partnerIncomes.sort((a, b) => new Date(b.date || b.createdAt) - new Date(a.date || a.createdAt))[0];
 
     return {
       ...p,
+      id: pId,
+      _id: pId,
       totalMoney: totalAmount,
       sharePercent: Number(sharePercent),
       entriesCount: partnerIncomes.length,
-      lastIncomeDate: lastIncome ? lastIncome.date : null,
+      lastIncomeDate: lastIncome ? (lastIncome.date || lastIncome.createdAt) : null,
       lastIncomeAmount: lastIncome ? lastIncome.amount : null,
     };
   });
@@ -193,25 +234,30 @@ export const PartnersView = () => {
 
   // Filtered partners
   const filteredPartners = partnersWithStats.filter((p) => {
+    const search = partnerSearch.toLowerCase().trim();
+    if (!search) return true;
     const matchesSearch =
-      p.name.toLowerCase().includes(partnerSearch.toLowerCase()) ||
-      (p.role && p.role.toLowerCase().includes(partnerSearch.toLowerCase())) ||
-      (p.phone && p.phone.toLowerCase().includes(partnerSearch.toLowerCase())) ||
-      (p.email && p.email.toLowerCase().includes(partnerSearch.toLowerCase()));
+      (p.name || '').toLowerCase().includes(search) ||
+      (p.role && p.role.toLowerCase().includes(search)) ||
+      (p.phone && p.phone.toLowerCase().includes(search)) ||
+      (p.email && p.email.toLowerCase().includes(search));
     return matchesSearch;
   });
 
   // Filtered incomes for ledger
   const filteredIncomes = incomes.filter((inc) => {
-    const partner = partners.find((p) => p.id === inc.partnerId);
+    const incPartnerId = (inc.partnerId || '').toString();
+    const partner = partners.find((p) => (p.id || p._id)?.toString() === incPartnerId);
     const partnerName = partner ? partner.name : '';
+    const search = incomeSearch.toLowerCase().trim();
     const matchesSearch =
-      partnerName.toLowerCase().includes(incomeSearch.toLowerCase()) ||
-      (inc.purpose && inc.purpose.toLowerCase().includes(incomeSearch.toLowerCase())) ||
-      (inc.paymentMode && inc.paymentMode.toLowerCase().includes(incomeSearch.toLowerCase())) ||
-      (inc.referenceNo && inc.referenceNo.toLowerCase().includes(incomeSearch.toLowerCase()));
+      !search ||
+      partnerName.toLowerCase().includes(search) ||
+      (inc.purpose && inc.purpose.toLowerCase().includes(search)) ||
+      (inc.paymentMode && inc.paymentMode.toLowerCase().includes(search)) ||
+      (inc.referenceNo && inc.referenceNo.toLowerCase().includes(search));
     const matchesPartner =
-      partnerFilterForIncome === 'All' || inc.partnerId === partnerFilterForIncome;
+      partnerFilterForIncome === 'All' || incPartnerId === partnerFilterForIncome.toString();
     return matchesSearch && matchesPartner;
   });
 
@@ -276,7 +322,7 @@ export const PartnersView = () => {
         <div className="flex items-center gap-2 overflow-x-auto custom-scrollbar pb-1 sm:pb-0">
           <button
             onClick={() => setActiveTab('summary')}
-            className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all whitespace-nowrap ${
+            className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all whitespace-nowrap cursor-pointer ${
               activeTab === 'summary'
                 ? 'bg-slate-900 text-white shadow-xs'
                 : 'bg-white text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-slate-200'
@@ -297,7 +343,7 @@ export const PartnersView = () => {
 
           <button
             onClick={() => setActiveTab('ledger')}
-            className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all whitespace-nowrap ${
+            className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all whitespace-nowrap cursor-pointer ${
               activeTab === 'ledger'
                 ? 'bg-slate-900 text-white shadow-xs'
                 : 'bg-white text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-slate-200'
@@ -321,6 +367,16 @@ export const PartnersView = () => {
         <div className="flex items-center gap-2">
           <button
             onClick={() => {
+              setEditingPartner(null);
+              setIsAddPartnerOpen(true);
+            }}
+            className="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition-colors shrink-0 cursor-pointer"
+          >
+            <Plus className="w-3.5 h-3.5 text-slate-500" />
+            <span>Add Partner</span>
+          </button>
+          <button
+            onClick={() => {
               setSelectedPartnerForIncome(null);
               setIsAddIncomeOpen(true);
             }}
@@ -332,8 +388,16 @@ export const PartnersView = () => {
         </div>
       </div>
 
+      {/* Loading state indicator */}
+      {loading && (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="w-6 h-6 animate-spin text-amber-600" />
+          <span className="ml-2 text-xs font-medium text-slate-500">Loading partners data...</span>
+        </div>
+      )}
+
       {/* ======================= TAB 1: ALL PARTNERS & CAPITAL SUMMARY ======================= */}
-      {activeTab === 'summary' && (
+      {!loading && activeTab === 'summary' && (
         <div className="space-y-4">
           {/* Search bar */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
@@ -370,7 +434,7 @@ export const PartnersView = () => {
 
                 return (
                   <div
-                    key={p.id}
+                    key={p.id || p._id}
                     className="bg-white border border-slate-100 rounded-2xl p-5 shadow-xs hover:shadow-md hover:border-amber-200 transition-all flex flex-col justify-between group"
                   >
                     <div>
@@ -458,7 +522,7 @@ export const PartnersView = () => {
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => {
-                            setSelectedPartnerForIncome(p.id);
+                            setSelectedPartnerForIncome(p.id || p._id);
                             setIsAddIncomeOpen(true);
                           }}
                           className="flex-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-semibold py-1.5 px-2.5 rounded-xl flex items-center justify-center gap-1 transition-colors cursor-pointer border border-emerald-200"
@@ -482,15 +546,15 @@ export const PartnersView = () => {
                             setEditingPartner(p);
                             setIsAddPartnerOpen(true);
                           }}
-                          className="text-xs font-semibold text-slate-500 hover:text-slate-800 flex items-center gap-1 p-1 rounded-lg hover:bg-slate-100 transition-colors"
+                          className="text-xs font-semibold text-slate-500 hover:text-slate-800 flex items-center gap-1 p-1 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
                         >
                           <Edit2 className="w-3.5 h-3.5 text-slate-400" />
                           <span>Edit</span>
                         </button>
 
                         <button
-                          onClick={() => handleDeletePartner(p.id, p.name)}
-                          className="text-xs font-semibold text-rose-500 hover:text-rose-700 flex items-center gap-1 p-1 rounded-lg hover:bg-rose-50 transition-colors"
+                          onClick={() => handleDeletePartner(p.id || p._id, p.name)}
+                          className="text-xs font-semibold text-rose-500 hover:text-rose-700 flex items-center gap-1 p-1 rounded-lg hover:bg-rose-50 transition-colors cursor-pointer"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                           <span>Delete</span>
@@ -506,7 +570,7 @@ export const PartnersView = () => {
       )}
 
       {/* ======================= TAB 2: ALL INCOME / DEPOSIT LEDGER ======================= */}
-      {activeTab === 'ledger' && (
+      {!loading && activeTab === 'ledger' && (
         <div className="space-y-4">
           {/* Filter and Search Bar for Ledger */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
@@ -529,7 +593,7 @@ export const PartnersView = () => {
               >
                 <option value="All">All Partners</option>
                 {partners.map((p) => (
-                  <option key={p.id} value={p.id}>
+                  <option key={p.id || p._id} value={p.id || p._id}>
                     {p.name}
                   </option>
                 ))}
@@ -565,12 +629,12 @@ export const PartnersView = () => {
                   </thead>
                   <tbody className="divide-y divide-slate-50 text-slate-700">
                     {filteredIncomes.map((inc) => {
-                      const partner = partners.find((p) => p.id === inc.partnerId);
+                      const partner = partners.find((p) => (p.id || p._id)?.toString() === (inc.partnerId)?.toString());
 
                       return (
-                        <tr key={inc.id} className="hover:bg-slate-50/50 transition-colors">
+                        <tr key={inc.id || inc._id} className="hover:bg-slate-50/50 transition-colors">
                           <td className="py-3.5 px-5 text-slate-400 whitespace-nowrap">
-                            {new Date(inc.date).toLocaleDateString('en-US', {
+                            {new Date(inc.date || inc.createdAt).toLocaleDateString('en-US', {
                               month: 'short',
                               day: 'numeric',
                               year: 'numeric',
@@ -605,8 +669,8 @@ export const PartnersView = () => {
 
                           <td className="py-3.5 px-5 text-right">
                             <button
-                              onClick={() => handleDeleteIncome(inc.id, inc.amount)}
-                              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                              onClick={() => handleDeleteIncome(inc.id || inc._id, inc.amount)}
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
                               title="Delete entry"
                             >
                               <Trash2 className="w-4 h-4" />

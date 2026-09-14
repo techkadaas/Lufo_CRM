@@ -6,6 +6,8 @@ import { Stock } from '../models/Stock.js';
 import { Order } from '../models/Order.js';
 import { Expense } from '../models/Expense.js';
 import { User } from '../models/User.js';
+import { Partner } from '../models/Partner.js';
+import { PartnerIncome } from '../models/PartnerIncome.js';
 import { getDBStatus } from '../config/db.js';
 import { initialStockData, initialExpenseData, initialOrderData } from '../utils/seeder.js';
 import { getDateRange } from '../utils/dateHelper.js';
@@ -17,6 +19,8 @@ const USERS_FILE = path.join(STORE_DIR, 'users_store.json');
 const STOCKS_FILE = path.join(STORE_DIR, 'stocks_store.json');
 const EXPENSES_FILE = path.join(STORE_DIR, 'expenses_store.json');
 const ORDERS_FILE = path.join(STORE_DIR, 'orders_store.json');
+const PARTNERS_FILE = path.join(STORE_DIR, 'partners_store.json');
+const PARTNER_INCOMES_FILE = path.join(STORE_DIR, 'partner_incomes_store.json');
 
 // Ensure store directory exists
 if (!fs.existsSync(STORE_DIR)) {
@@ -60,7 +64,29 @@ const loadFallbackUsers = () => {
     updatedAt: new Date().toISOString(),
   };
 
-  const initialUsers = [defaultAdmin, defaultStaff];
+  const defaultArapsa = {
+    _id: 'user_arapsa_staff',
+    name: 'Arapsa',
+    username: 'arapsa@lufo.com',
+    password: bcrypt.hashSync('Arapsa@lufo2', salt),
+    role: 'staff',
+    isActive: true,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+
+  const defaultNajeer = {
+    _id: 'user_najeer_staff',
+    name: 'Najeer',
+    username: 'najeer@lufo.com',
+    password: bcrypt.hashSync('Najeer@lufo4', salt),
+    role: 'staff',
+    isActive: true,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+
+  const initialUsers = [defaultAdmin, defaultStaff, defaultArapsa, defaultNajeer];
 
   try {
     fs.writeFileSync(USERS_FILE, JSON.stringify(initialUsers, null, 2), 'utf8');
@@ -184,6 +210,52 @@ const saveFallbackOrders = () => {
   }
 };
 
+// Load or initialize fallback partners
+const loadFallbackPartners = () => {
+  try {
+    if (fs.existsSync(PARTNERS_FILE)) {
+      const data = fs.readFileSync(PARTNERS_FILE, 'utf8');
+      return JSON.parse(data);
+    }
+  } catch (err) {
+    console.warn('Error reading fallback partners file:', err.message);
+  }
+  return [];
+};
+
+let memPartners = loadFallbackPartners();
+
+const saveFallbackPartners = () => {
+  try {
+    fs.writeFileSync(PARTNERS_FILE, JSON.stringify(memPartners, null, 2), 'utf8');
+  } catch (err) {
+    console.warn('Error saving fallback partners:', err.message);
+  }
+};
+
+// Load or initialize fallback partner incomes
+const loadFallbackPartnerIncomes = () => {
+  try {
+    if (fs.existsSync(PARTNER_INCOMES_FILE)) {
+      const data = fs.readFileSync(PARTNER_INCOMES_FILE, 'utf8');
+      return JSON.parse(data);
+    }
+  } catch (err) {
+    console.warn('Error reading fallback partner incomes file:', err.message);
+  }
+  return [];
+};
+
+let memPartnerIncomes = loadFallbackPartnerIncomes();
+
+const saveFallbackPartnerIncomes = () => {
+  try {
+    fs.writeFileSync(PARTNER_INCOMES_FILE, JSON.stringify(memPartnerIncomes, null, 2), 'utf8');
+  } catch (err) {
+    console.warn('Error saving fallback partner incomes:', err.message);
+  }
+};
+
 
 export const Store = {
   // STOCKS
@@ -284,31 +356,44 @@ export const Store = {
     const dateRange = getDateRange(filters);
 
     if (getDBStatus()) {
-      const query = {};
-      if (filters.search) {
-        query.$or = [
-          { billNumber: { $regex: filters.search, $options: 'i' } },
-          { 'customer.name': { $regex: filters.search, $options: 'i' } },
-          { 'customer.phone': { $regex: filters.search, $options: 'i' } },
-        ];
+      const conditions = [];
+
+      if (filters.search && filters.search.trim()) {
+        const s = filters.search.trim();
+        conditions.push({
+          $or: [
+            { billNumber: { $regex: s, $options: 'i' } },
+            { 'customer.name': { $regex: s, $options: 'i' } },
+            { 'customer.phone': { $regex: s, $options: 'i' } },
+          ],
+        });
       }
+
       if (filters.status && filters.status !== 'All') {
-        query.status = filters.status;
+        conditions.push({ status: filters.status });
       }
+
       if (dateRange) {
-        query.orderDate = { $gte: dateRange.start, $lte: dateRange.end };
+        conditions.push({
+          $or: [
+            { orderDate: { $gte: dateRange.start, $lte: dateRange.end } },
+            { createdAt: { $gte: dateRange.start, $lte: dateRange.end } },
+          ],
+        });
       }
+
+      const query = conditions.length > 0 ? { $and: conditions } : {};
       return await Order.find(query).sort({ orderDate: -1, createdAt: -1 });
     }
 
     let result = [...memOrders];
-    if (filters.search) {
-      const s = filters.search.toLowerCase();
+    if (filters.search && filters.search.trim()) {
+      const s = filters.search.trim().toLowerCase();
       result = result.filter(
         (o) =>
-          o.billNumber.toLowerCase().includes(s) ||
-          o.customer.name.toLowerCase().includes(s) ||
-          o.customer.phone.toLowerCase().includes(s)
+          (o.billNumber || '').toLowerCase().includes(s) ||
+          (o.customer?.name || '').toLowerCase().includes(s) ||
+          (o.customer?.phone || '').toLowerCase().includes(s)
       );
     }
     if (filters.status && filters.status !== 'All') {
@@ -823,6 +908,170 @@ export const Store = {
       return await bcrypt.compare(enteredPassword, user.password);
     }
     return false;
+  },
+
+  // PARTNERS & PARTNER INCOMES
+  async getPartners(filters = {}) {
+    if (getDBStatus()) {
+      try {
+        const query = {};
+        if (filters.search && filters.search.trim()) {
+          const s = filters.search.trim();
+          query.$or = [
+            { name: { $regex: s, $options: 'i' } },
+            { role: { $regex: s, $options: 'i' } },
+            { phone: { $regex: s, $options: 'i' } },
+            { email: { $regex: s, $options: 'i' } },
+          ];
+        }
+        return await Partner.find(query).sort({ createdAt: -1 });
+      } catch (e) {
+        console.warn('DB getPartners fallback:', e.message);
+      }
+    }
+
+    let result = [...memPartners];
+    if (filters.search && filters.search.trim()) {
+      const s = filters.search.trim().toLowerCase();
+      result = result.filter(
+        (p) =>
+          (p.name || '').toLowerCase().includes(s) ||
+          (p.role || '').toLowerCase().includes(s) ||
+          (p.phone || '').toLowerCase().includes(s) ||
+          (p.email || '').toLowerCase().includes(s)
+      );
+    }
+    return result.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  },
+
+  async getPartnerById(id) {
+    if (getDBStatus()) {
+      try {
+        const partner = await Partner.findById(id);
+        if (partner) return partner;
+      } catch (e) {
+        console.warn('DB getPartnerById fallback:', e.message);
+      }
+    }
+    return memPartners.find((p) => (p._id || p.id)?.toString() === id.toString()) || null;
+  },
+
+  async createPartner(data) {
+    if (getDBStatus()) {
+      try {
+        const newPartner = new Partner(data);
+        return await newPartner.save();
+      } catch (e) {
+        console.warn('DB createPartner fallback:', e.message);
+      }
+    }
+    const newPartner = {
+      ...data,
+      _id: `ptn_${Date.now()}`,
+      id: `ptn_${Date.now()}`,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    memPartners.unshift(newPartner);
+    saveFallbackPartners();
+    return newPartner;
+  },
+
+  async updatePartner(id, data) {
+    if (getDBStatus()) {
+      try {
+        const updated = await Partner.findByIdAndUpdate(id, data, { new: true, runValidators: true });
+        if (updated) return updated;
+      } catch (e) {
+        console.warn('DB updatePartner fallback:', e.message);
+      }
+    }
+    const idx = memPartners.findIndex((p) => (p._id || p.id)?.toString() === id.toString());
+    if (idx === -1) return null;
+    memPartners[idx] = { ...memPartners[idx], ...data, updatedAt: new Date().toISOString() };
+    saveFallbackPartners();
+    return memPartners[idx];
+  },
+
+  async deletePartner(id) {
+    if (getDBStatus()) {
+      try {
+        await Partner.findByIdAndDelete(id);
+        await PartnerIncome.deleteMany({ partnerId: id.toString() });
+      } catch (e) {
+        console.warn('DB deletePartner fallback:', e.message);
+      }
+    }
+    const idx = memPartners.findIndex((p) => (p._id || p.id)?.toString() === id.toString());
+    if (idx !== -1) {
+      memPartners.splice(idx, 1);
+      saveFallbackPartners();
+    }
+    // Also remove associated incomes
+    memPartnerIncomes = memPartnerIncomes.filter(
+      (i) => i.partnerId?.toString() !== id.toString()
+    );
+    saveFallbackPartnerIncomes();
+    return true;
+  },
+
+  // PARTNER INCOMES
+  async getPartnerIncomes(filters = {}) {
+    if (getDBStatus()) {
+      try {
+        const query = {};
+        if (filters.partnerId && filters.partnerId !== 'All') {
+          query.partnerId = filters.partnerId;
+        }
+        return await PartnerIncome.find(query).sort({ date: -1, createdAt: -1 });
+      } catch (e) {
+        console.warn('DB getPartnerIncomes fallback:', e.message);
+      }
+    }
+
+    let result = [...memPartnerIncomes];
+    if (filters.partnerId && filters.partnerId !== 'All') {
+      result = result.filter((i) => i.partnerId?.toString() === filters.partnerId.toString());
+    }
+    return result.sort((a, b) => new Date(b.date || b.createdAt) - new Date(a.date || a.createdAt));
+  },
+
+  async createPartnerIncome(data) {
+    if (getDBStatus()) {
+      try {
+        const newIncome = new PartnerIncome(data);
+        return await newIncome.save();
+      } catch (e) {
+        console.warn('DB createPartnerIncome fallback:', e.message);
+      }
+    }
+    const newIncome = {
+      ...data,
+      _id: `inc_${Date.now()}`,
+      id: `inc_${Date.now()}`,
+      date: data.date || new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    memPartnerIncomes.unshift(newIncome);
+    saveFallbackPartnerIncomes();
+    return newIncome;
+  },
+
+  async deletePartnerIncome(id) {
+    if (getDBStatus()) {
+      try {
+        await PartnerIncome.findByIdAndDelete(id);
+      } catch (e) {
+        console.warn('DB deletePartnerIncome fallback:', e.message);
+      }
+    }
+    const idx = memPartnerIncomes.findIndex((i) => (i._id || i.id)?.toString() === id.toString());
+    if (idx !== -1) {
+      memPartnerIncomes.splice(idx, 1);
+      saveFallbackPartnerIncomes();
+    }
+    return true;
   },
 };
 

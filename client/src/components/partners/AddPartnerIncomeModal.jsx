@@ -8,9 +8,8 @@ export const AddPartnerIncomeModal = ({
   onSaveIncome,
   defaultPartnerId = null,
 }) => {
-  const [partnerId, setPartnerId] = useState(
-    defaultPartnerId || (partners && partners.length > 0 ? partners[0].id : '')
-  );
+  const getFirstPartnerId = () => (partners && partners.length > 0 ? (partners[0].id || partners[0]._id) : '');
+  const [partnerId, setPartnerId] = useState(defaultPartnerId || getFirstPartnerId());
   const [amount, setAmount] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [paymentMode, setPaymentMode] = useState('UPI');
@@ -21,16 +20,16 @@ export const AddPartnerIncomeModal = ({
     if (defaultPartnerId) {
       setPartnerId(defaultPartnerId);
     } else if (partners && partners.length > 0 && !partnerId) {
-      setPartnerId(partners[0].id);
+      setPartnerId(partners[0].id || partners[0]._id);
     }
-  }, [defaultPartnerId, partners]);
+  }, [defaultPartnerId, partners, partnerId]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!partnerId || !amount) return;
 
     onSaveIncome({
-      partnerId,
+      partnerId: partnerId.toString(),
       amount: parseFloat(amount) || 0,
       date,
       paymentMode,
@@ -63,11 +62,14 @@ export const AddPartnerIncomeModal = ({
             onChange={(e) => setPartnerId(e.target.value)}
             className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs sm:text-sm text-slate-900 focus:bg-white focus:border-amber-600 outline-none cursor-pointer"
           >
-            {partners.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name} {p.role ? `(${p.role})` : ''}
-              </option>
-            ))}
+            {partners.map((p) => {
+              const pId = p.id || p._id;
+              return (
+                <option key={pId} value={pId}>
+                  {p.name} {p.role ? `(${p.role})` : ''}
+                </option>
+              );
+            })}
           </select>
         </div>
 

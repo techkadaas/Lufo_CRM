@@ -17,6 +17,14 @@ import {
 import { toPng } from 'html-to-image';
 import { OrderStatusBadge } from './OrderStatusBadge';
 
+export const formatOrderNumber = (val) => {
+  if (!val) return '01';
+  const clean = String(val).replace(/[^0-9]/g, '');
+  if (!clean) return String(val);
+  const num = parseInt(clean, 10);
+  return String(num).padStart(2, '0');
+};
+
 export const OrderInvoiceModal = ({ order, onClose }) => {
   const { showToast } = useApp();
   const [copied, setCopied] = useState(false);
@@ -30,55 +38,17 @@ export const OrderInvoiceModal = ({ order, onClose }) => {
     year: 'numeric',
   });
 
-  const orderNumberDisplay = `#ORD-${
-    (order.billNumber || '').replace(/[^0-9]/g, '').padStart(6, '0') || '000001'
-  }`;
+  const orderNumFormatted = formatOrderNumber(order.billNumber);
+  const orderNumberDisplay = `#${orderNumFormatted}`;
 
-  const invoiceNumberDisplay = `#LC-${
-    (order.billNumber || '').replace(/[^0-9]/g, '').padStart(6, '0') || '000001'
-  }`;
-
-  // 1. Generate text receipt for WhatsApp / Copy
-  const generateReceiptText = () => {
-    const itemsText = (order.items || [])
-      .map(
-        (it, idx) =>
-          `${idx + 1}. ${it.name} (${it.size || 'M'}${it.color ? `, ${it.color}` : ''}) x ${it.quantity} = ₹${(it.total || 0).toLocaleString()}`
-      )
-      .join('\n');
-
-    return `*LUFO CLOTHING — OFFICIAL INVOICE*
-----------------------------------------
-*Invoice No:* ${invoiceNumberDisplay}
-*Date:* ${formattedDate}
-*Order No:* ${orderNumberDisplay}
-*Payment Method:* ${order.paymentMethod || 'Online Payment'}
-
-*BILL TO:*
-*${order.customer?.name || 'Customer'}*
-${order.customer?.phone ? `Phone: ${order.customer.phone}\n` : ''}${order.customer?.address ? `Address: ${order.customer.address}\n` : ''}
-*ITEMS:*
-${itemsText}
-
-----------------------------------------
-*Subtotal:* ₹${(order.subtotal || order.totalAmount || 0).toLocaleString()}
-*Shipping:* ₹0
-*TOTAL AMOUNT:* ₹${(order.totalAmount || 0).toLocaleString()}
-----------------------------------------
-*Thank you for choosing LUFO Clothing!*
-🌐 www.lufoclothing.com
-📸 @lufo_clothing_trichy
-✉️ lufoclothingofficial@gmail.com`;
-  };
-
-  // 2. Download as High-Resolution PNG Image
+  // 1. Download as High-Resolution PNG Image
   const handleDownloadImage = async () => {
     const node = document.getElementById('printable-invoice');
     if (!node) return;
 
     try {
       setIsExportingImage(true);
-      showToast('Generating high-resolution invoice image...');
+      showToast('Generating invoice image...');
 
       const dataUrl = await toPng(node, {
         quality: 1,
@@ -88,10 +58,10 @@ ${itemsText}
       });
 
       const link = document.createElement('a');
-      link.download = `LUFO-Invoice-${order.billNumber || 'receipt'}.png`;
+      link.download = `LUFO-Order-${orderNumFormatted}.png`;
       link.href = dataUrl;
       link.click();
-      showToast(`Invoice saved as image (${order.billNumber || 'receipt'}.png)!`);
+      showToast(`Invoice image saved (LUFO-Order-${orderNumFormatted}.png)!`);
     } catch (error) {
       console.error('Error generating image:', error);
       showToast('Failed to download invoice image', 'error');
@@ -100,86 +70,152 @@ ${itemsText}
     }
   };
 
-  // 3. Native Print / Save to PDF
+  // 2. Native Print / Save to PDF
   const handlePrint = () => {
     window.print();
   };
 
-  // 4. Share on WhatsApp directly to the customer's phone number
-  const handleShareWhatsApp = () => {
-    const rawPhone = (order.customer?.phone || '').replace(/\D/g, '');
-    let cleanPhone = rawPhone.replace(/^0+/, '');
-    if (cleanPhone.length === 10) {
-      cleanPhone = `91${cleanPhone}`;
-    }
+  // 3. Share as Image to WhatsApp directly to customer
+  const handleShareWhatsApp = async () => {
+    const node = document.getElementById('printable-invoice');
+    if (!node) return;
 
-    const text = encodeURIComponent(generateReceiptText());
-
-    if (!cleanPhone) {
-      showToast('No customer phone number available', 'warning');
-      window.open(`https://wa.me/?text=${text}`, '_blank');
-      return;
-    }
-
-    const url = `https://wa.me/${cleanPhone}?text=${text}`;
-    window.open(url, '_blank');
-    showToast(`Opening WhatsApp chat with ${order.customer?.name || 'Customer'} (${order.customer?.phone})...`);
-  };
-
-  // 5. Copy Text to Clipboard
-  const handleCopyText = async () => {
     try {
-      await navigator.clipboard.writeText(generateReceiptText());
-      setCopied(true);
-      showToast('Invoice summary copied to clipboard!');
-      setTimeout(() => setCopied(false), 2500);
-    } catch (err) {
-      showToast('Failed to copy to clipboard', 'error');
+      setIsExportingImage(true);
+      showToast('Generating invoice image for WhatsApp...');
+
+      const dataUrl = await toPng(node, {
+        quality: 1,
+        pixelRatio: 2.5,
+        backgroundColor: '#F8F6F0',
+        cacheBust: true,
+      });
+
+      const res = await fetch(dataUrl);
+      const blob = await res.blob();
+      const file = new File([blob], `LUFO-Order-${orderNumFormatted}.png`, { type: 'image/png' });
+
+      // If mobile or desktop browser supports file sharing via Web Share API
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: `LUFO Clothing - Order #${orderNumFormatted}`,
+          text: `Order bill #${orderNumFormatted} for ${order.customer?.name || 'Customer'} (Total: ₹${(order.totalAmount || 0).toLocaleString()})`,
+        });
+        showToast('Invoice image shared successfully!');
+        return;
+      }
+
+      // For desktop WhatsApp Web fallback: Copy image to clipboard & trigger download + open chat
+      let copiedImage = false;
+      try {
+        if (navigator.clipboard && window.ClipboardItem) {
+          await navigator.clipboard.write([
+            new ClipboardItem({ 'image/png': blob }),
+          ]);
+          copiedImage = true;
+        }
+      } catch (clipboardErr) {
+        console.warn('Clipboard write error:', clipboardErr);
+      }
+
+      // Trigger image download
+      const link = document.createElement('a');
+      link.download = `LUFO-Order-${orderNumFormatted}.png`;
+      link.href = dataUrl;
+      link.click();
+
+      // Open WhatsApp chat directly with customer phone
+      const rawPhone = (order.customer?.phone || '').replace(/\D/g, '');
+      let cleanPhone = rawPhone.replace(/^0+/, '');
+      if (cleanPhone.length === 10) cleanPhone = `91${cleanPhone}`;
+
+      const waUrl = cleanPhone ? `https://wa.me/${cleanPhone}` : `https://wa.me/`;
+      window.open(waUrl, '_blank');
+
+      if (copiedImage) {
+        showToast(`Invoice image copied & downloaded! Paste (Ctrl+V) in WhatsApp chat with ${order.customer?.name || 'Customer'}.`, 'success');
+      } else {
+        showToast(`Invoice image downloaded! Attach it in WhatsApp chat with ${order.customer?.name || 'Customer'}.`, 'success');
+      }
+    } catch (error) {
+      if (error.name !== 'AbortError') {
+        console.error('Error sharing image on WhatsApp:', error);
+        showToast('Failed to prepare invoice image', 'error');
+      }
+    } finally {
+      setIsExportingImage(false);
     }
   };
 
-  // 6. Native Share
+  // 4. Copy Image to Clipboard
+  const handleCopyImage = async () => {
+    const node = document.getElementById('printable-invoice');
+    if (!node) return;
+
+    try {
+      setIsExportingImage(true);
+      const dataUrl = await toPng(node, {
+        quality: 1,
+        pixelRatio: 2.5,
+        backgroundColor: '#F8F6F0',
+        cacheBust: true,
+      });
+
+      const res = await fetch(dataUrl);
+      const blob = await res.blob();
+
+      if (navigator.clipboard && window.ClipboardItem) {
+        await navigator.clipboard.write([
+          new ClipboardItem({ 'image/png': blob }),
+        ]);
+        setCopied(true);
+        showToast('Invoice image copied to clipboard! Paste (Ctrl+V) in WhatsApp or chat.');
+        setTimeout(() => setCopied(false), 3000);
+      } else {
+        const link = document.createElement('a');
+        link.download = `LUFO-Order-${orderNumFormatted}.png`;
+        link.href = dataUrl;
+        link.click();
+        showToast('Invoice image downloaded!');
+      }
+    } catch (err) {
+      console.error('Failed to copy image:', err);
+      handleDownloadImage();
+    } finally {
+      setIsExportingImage(false);
+    }
+  };
+
+  // 5. Native Share with Image File
   const handleNativeShare = async () => {
     const node = document.getElementById('printable-invoice');
-    if (node && navigator.canShare) {
-      try {
-        const dataUrl = await toPng(node, { quality: 1, pixelRatio: 2, backgroundColor: '#F8F6F0' });
-        const res = await fetch(dataUrl);
-        const blob = await res.blob();
-        const file = new File([blob], `LUFO-Invoice-${order.billNumber || 'bill'}.png`, { type: 'image/png' });
+    if (!node) return;
 
-        if (navigator.canShare({ files: [file] })) {
-          await navigator.share({
-            files: [file],
-            title: `Invoice ${order.billNumber} - LUFO Clothing`,
-            text: `Invoice for order ${order.billNumber} (Total: ₹${(order.totalAmount || 0).toLocaleString()})`,
-          });
-          showToast('Invoice shared successfully!');
-          return;
-        }
-      } catch (err) {
-        if (err.name !== 'AbortError') {
-          // fallback
-        } else {
-          return;
-        }
-      }
-    }
+    try {
+      setIsExportingImage(true);
+      const dataUrl = await toPng(node, { quality: 1, pixelRatio: 2.5, backgroundColor: '#F8F6F0' });
+      const res = await fetch(dataUrl);
+      const blob = await res.blob();
+      const file = new File([blob], `LUFO-Order-${orderNumFormatted}.png`, { type: 'image/png' });
 
-    if (navigator.share) {
-      try {
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
         await navigator.share({
-          title: `Invoice ${order.billNumber} - LUFO Clothing`,
-          text: generateReceiptText(),
+          files: [file],
+          title: `LUFO Clothing - Order #${orderNumFormatted}`,
+          text: `Order bill #${orderNumFormatted} (Total: ₹${(order.totalAmount || 0).toLocaleString()})`,
         });
-        showToast('Invoice shared successfully!');
-      } catch (err) {
-        if (err.name !== 'AbortError') {
-          handleShareWhatsApp();
-        }
+        showToast('Invoice image shared successfully!');
+        return;
       }
-    } else {
+
       handleShareWhatsApp();
+    } catch (err) {
+      if (err.name !== 'AbortError') {
+        handleShareWhatsApp();
+      }
+    } finally {
+      setIsExportingImage(false);
     }
   };
 
@@ -187,8 +223,8 @@ ${itemsText}
     <Modal
       isOpen={!!order}
       onClose={onClose}
-      title={`Boutique Invoice - ${order.billNumber}`}
-      subtitle="Official LUFO Clothing customer bill and store invoice receipt"
+      title={`Order Bill - #${orderNumFormatted}`}
+      subtitle="Official LUFO Clothing customer bill and order receipt"
       maxWidth="max-w-2xl"
     >
       <div className="space-y-4">
@@ -200,53 +236,56 @@ ${itemsText}
           </div>
 
           <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+            {/* Share as Image on WhatsApp */}
+            <button
+              type="button"
+              onClick={handleShareWhatsApp}
+              disabled={isExportingImage}
+              className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm disabled:opacity-50 cursor-pointer"
+              title="Share invoice as image directly on WhatsApp"
+            >
+              {isExportingImage ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <MessageSquare className="w-3.5 h-3.5" />
+              )}
+              <span>{isExportingImage ? 'Preparing...' : 'Share Image on WhatsApp'}</span>
+            </button>
+
             {/* Download Image */}
             <button
               type="button"
               onClick={handleDownloadImage}
               disabled={isExportingImage}
-              className="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm disabled:opacity-50 cursor-pointer"
-              title="Download invoice directly as a PNG image"
+              className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold flex items-center gap-1.5 transition-all shadow-2xs disabled:opacity-50 cursor-pointer"
+              title="Download bill as a high-res PNG image"
             >
-              {isExportingImage ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              ) : (
-                <FileImage className="w-3.5 h-3.5" />
-              )}
-              <span>{isExportingImage ? 'Saving...' : 'Download Image'}</span>
+              <FileImage className="w-3.5 h-3.5" />
+              <span className="hidden xs:inline">Save Image</span>
             </button>
 
-            {/* WhatsApp Share */}
+            {/* Copy Image */}
             <button
               type="button"
-              onClick={handleShareWhatsApp}
-              className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-2xs cursor-pointer"
-              title="Share invoice directly to WhatsApp"
+              onClick={handleCopyImage}
+              disabled={isExportingImage}
+              className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition-colors border border-slate-700 shadow-2xs cursor-pointer"
+              title="Copy bill image to clipboard"
             >
-              <MessageSquare className="w-3.5 h-3.5" />
-              <span className="hidden xs:inline">WhatsApp</span>
+              {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+              <span className="hidden xs:inline">{copied ? 'Copied' : 'Copy Image'}</span>
             </button>
 
-            {/* Share */}
+            {/* Share via Apps */}
             <button
               type="button"
               onClick={handleNativeShare}
+              disabled={isExportingImage}
               className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition-colors border border-slate-700 shadow-2xs cursor-pointer"
-              title="Share via apps"
+              title="Share image via installed apps"
             >
               <Share2 className="w-3.5 h-3.5" />
               <span className="hidden xs:inline">Share</span>
-            </button>
-
-            {/* Copy Text */}
-            <button
-              type="button"
-              onClick={handleCopyText}
-              className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition-colors border border-slate-700 shadow-2xs cursor-pointer"
-              title="Copy invoice text"
-            >
-              {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-              <span className="hidden xs:inline">{copied ? 'Copied' : 'Copy'}</span>
             </button>
 
             {/* Print / Save as PDF */}
@@ -294,7 +333,7 @@ ${itemsText}
             </svg>
           </div>
 
-          <div className="relative z-10 flex flex-col justify-between min-h-[580px] space-y-6">
+          <div className="relative z-10 flex flex-col justify-between min-h-[560px] space-y-6">
             {/* Header: Brand Left & Slogan Right */}
             <div className="flex items-start justify-between gap-3">
               {/* Brand Logo & Taglines */}
@@ -318,12 +357,12 @@ ${itemsText}
               </div>
             </div>
 
-            {/* INVOICE Title & Order Meta Row */}
+            {/* Bill Title & Order Meta Row */}
             <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 pt-1">
-              {/* Left: INVOICE and Greeting */}
+              {/* Left: Greeting */}
               <div>
                 <h2 className="text-lg sm:text-xl font-bold tracking-[0.28em] text-slate-900 uppercase">
-                  I N V O I C E
+                  B I L L
                 </h2>
                 <p className="text-[11px] sm:text-xs text-slate-600 mt-1 leading-snug">
                   Thank you for choosing LUFO Clothing.
@@ -332,23 +371,23 @@ ${itemsText}
                 </p>
               </div>
 
-              {/* Right: Meta Details with vertical line */}
-              <div className="border-l border-slate-300 pl-3.5 sm:pl-4 py-0.5 space-y-1 text-[11px] sm:text-xs shrink-0 self-start">
-                <div className="flex items-center justify-between sm:justify-start gap-4">
-                  <span className="text-slate-500 min-w-[90px]">Invoice No</span>
-                  <span className="font-semibold text-slate-900">{invoiceNumberDisplay}</span>
-                </div>
-                <div className="flex items-center justify-between sm:justify-start gap-4">
-                  <span className="text-slate-500 min-w-[90px]">Invoice Date</span>
-                  <span className="font-medium text-slate-800">{formattedDate}</span>
-                </div>
+              {/* Right: Meta Details with vertical line (NO INVOICE NUMBER) */}
+              <div className="border-l border-slate-300 pl-3.5 sm:pl-4 py-0.5 space-y-1.5 text-[11px] sm:text-xs shrink-0 self-start">
                 <div className="flex items-center justify-between sm:justify-start gap-4">
                   <span className="text-slate-500 min-w-[90px]">Order No</span>
-                  <span className="font-semibold text-slate-900">{orderNumberDisplay}</span>
+                  <span className="font-bold font-mono text-slate-950">{orderNumberDisplay}</span>
+                </div>
+                <div className="flex items-center justify-between sm:justify-start gap-4">
+                  <span className="text-slate-500 min-w-[90px]">Order Date</span>
+                  <span className="font-medium text-slate-800">{formattedDate}</span>
                 </div>
                 <div className="flex items-center justify-between sm:justify-start gap-4">
                   <span className="text-slate-500 min-w-[90px]">Payment Method</span>
                   <span className="font-medium text-slate-800">{order.paymentMethod || 'Online Payment'}</span>
+                </div>
+                <div className="flex items-center justify-between sm:justify-start gap-4">
+                  <span className="text-slate-500 min-w-[90px]">Payment Status</span>
+                  <span className="font-semibold text-emerald-700">{order.paymentStatus || 'Paid'}</span>
                 </div>
               </div>
             </div>

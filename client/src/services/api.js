@@ -240,5 +240,79 @@ export const api = {
     if (!res.ok) throw new Error(data.message || 'Failed to delete expense');
     return data;
   },
+
+  // PARTNERS
+  async getPartners(params = {}) {
+    const query = new URLSearchParams(params).toString();
+    const res = await fetch(`${API_BASE}/partners${query ? `?${query}` : ''}`, {
+      headers: getAuthHeaders(),
+    });
+    if (!res.ok) throw new Error('Failed to fetch partners');
+    return await res.json();
+  },
+
+  async createPartner(partnerData) {
+    const res = await fetch(`${API_BASE}/partners`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(partnerData),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Failed to create partner');
+    return data;
+  },
+
+  async updatePartner(id, partnerData) {
+    const res = await fetch(`${API_BASE}/partners/${id}`, {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(partnerData),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Failed to update partner');
+    return data;
+  },
+
+  async deletePartner(id) {
+    const res = await fetch(`${API_BASE}/partners/${id}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders(),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Failed to delete partner');
+    return data;
+  },
+
+  // PARTNER INCOMES
+  async getPartnerIncomes(params = {}) {
+    const query = new URLSearchParams(params).toString();
+    const res = await fetch(`${API_BASE}/partners/incomes${query ? `?${query}` : ''}`, {
+      headers: getAuthHeaders(),
+    });
+    if (!res.ok) throw new Error('Failed to fetch partner incomes');
+    return await res.json();
+  },
+
+  async createPartnerIncome(incomeData) {
+    const res = await fetch(`${API_BASE}/partners/incomes`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(incomeData),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Failed to record partner income');
+    return data;
+  },
+
+  async deletePartnerIncome(id) {
+    const res = await fetch(`${API_BASE}/partners/incomes/${id}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders(),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Failed to delete partner income entry');
+    return data;
+  },
 };
+
 

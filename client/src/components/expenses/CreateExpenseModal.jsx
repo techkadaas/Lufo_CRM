@@ -154,7 +154,7 @@ export const CreateExpenseModal = ({ isOpen, onClose }) => {
         {/* Receipt Number */}
         <div>
           <label className="text-xs text-slate-700 block mb-1 font-semibold">
-            Receipt / Invoice Reference # <span className="text-slate-400 font-normal">(Optional)</span>
+            Receipt Reference # <span className="text-slate-400 font-normal">(Optional)</span>
           </label>
           <input
             type="text"

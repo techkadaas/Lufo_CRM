@@ -12,7 +12,8 @@ export const PartnerLedgerModal = ({
 }) => {
   if (!partner) return null;
 
-  const partnerContributions = contributions.filter((c) => c.partnerId === partner.id);
+  const partnerId = (partner.id || partner._id)?.toString();
+  const partnerContributions = contributions.filter((c) => (c.partnerId || '').toString() === partnerId);
   const totalPartnerMoney = partnerContributions.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
 
   return (
@@ -41,7 +42,7 @@ export const PartnerLedgerModal = ({
           <button
             onClick={() => {
               onClose();
-              onAddMoreMoney(partner.id);
+              onAddMoreMoney(partnerId);
             }}
             className="bg-amber-600 hover:bg-amber-700 text-white px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs shrink-0 cursor-pointer"
           >
@@ -70,9 +71,9 @@ export const PartnerLedgerModal = ({
                 </thead>
                 <tbody className="divide-y divide-slate-50 text-slate-700">
                   {partnerContributions.map((c) => (
-                    <tr key={c.id} className="hover:bg-slate-50/50">
+                    <tr key={c.id || c._id} className="hover:bg-slate-50/50">
                       <td className="py-3 px-4 text-slate-400 whitespace-nowrap">
-                        {new Date(c.date).toLocaleDateString('en-US', {
+                        {new Date(c.date || c.createdAt).toLocaleDateString('en-US', {
                           month: 'short',
                           day: 'numeric',
                           year: 'numeric',
@@ -90,7 +91,7 @@ export const PartnerLedgerModal = ({
                       </td>
                       <td className="py-3 px-4 text-right">
                         <button
-                          onClick={() => onDeleteContribution(c.id, c.amount)}
+                          onClick={() => onDeleteContribution(c.id || c._id, c.amount)}
                           className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
                           title="Delete entry"
                         >

@@ -6,6 +6,8 @@ import { EmptyState } from '../common/EmptyState';
 import { DateRangeFilter } from '../common/DateRangeFilter';
 import { Search, Eye, Trash2, Plus, ShoppingBag, MessageSquare } from 'lucide-react';
 
+import { formatOrderNumber } from './OrderInvoiceModal';
+
 export const OrderList = () => {
   const { showToast, triggerRefresh, refreshKey, setIsCreateOrderOpen, setSelectedInvoiceOrder } = useApp();
   const [orders, setOrders] = useState([]);
@@ -13,7 +15,7 @@ export const OrderList = () => {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [dateFilter, setDateFilter] = useState({
-    timeRange: 'this_month',
+    timeRange: 'all_time',
     startDate: '',
     endDate: '',
   });
@@ -26,7 +28,7 @@ export const OrderList = () => {
     try {
       setLoading(true);
       const res = await api.getOrders({
-        search,
+        search: search.trim(),
         status: statusFilter,
         timeRange: dateFilter.timeRange,
         startDate: dateFilter.startDate,
@@ -35,15 +37,26 @@ export const OrderList = () => {
 
       let currentOrders = res.success ? res.data : [];
 
-      // Resilient local cache merge to preserve orders across production cold restarts
+      // Resilient local cache merge and background sync to server
       try {
         const cached = JSON.parse(localStorage.getItem('lufo_crm_cached_orders') || '[]');
         if (cached && cached.length > 0) {
-          const serverIds = new Set(currentOrders.map((o) => o._id || o.billNumber));
-          const missingLocals = cached.filter((c) => !serverIds.has(c._id || c.billNumber));
+          const serverBills = new Set(currentOrders.map((o) => (o.billNumber || '').toUpperCase()));
+          const missingLocals = cached.filter((c) => c.billNumber && !serverBills.has(c.billNumber.toUpperCase()));
           
           if (missingLocals.length > 0) {
-            currentOrders = [...missingLocals, ...currentOrders];
+            // Auto-sync any orphaned local orders up to the server so ALL users can see them
+            for (const missing of missingLocals) {
+              try {
+                const syncRes = await api.createOrder(missing);
+                if (syncRes.success && syncRes.data) {
+                  currentOrders = [syncRes.data, ...currentOrders];
+                }
+              } catch (e) {
+                // If already on server or error, fallback include in current view
+                currentOrders = [missing, ...currentOrders];
+              }
+            }
           }
         }
         if (currentOrders.length > 0) {
@@ -86,12 +99,13 @@ export const OrderList = () => {
   };
 
   const handleDelete = async (orderId, billNumber) => {
-    if (!window.confirm(`Delete order ${billNumber}?`)) return;
+    const orderNum = formatOrderNumber(billNumber);
+    if (!window.confirm(`Delete order #${orderNum}?`)) return;
 
     try {
       const res = await api.deleteOrder(orderId);
       if (res.success) {
-        showToast(`Order ${billNumber} deleted`);
+        showToast(`Order #${orderNum} deleted`);
         // Remove from local cache
         try {
           const cached = JSON.parse(localStorage.getItem('lufo_crm_cached_orders') || '[]');
@@ -116,7 +130,7 @@ export const OrderList = () => {
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
             type="text"
-            placeholder="Search orders, phone, customer, bill #..."
+            placeholder="Search orders, phone, customer, order #..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-10 pr-4 py-2 rounded-xl bg-white border border-slate-200 text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:border-amber-600 outline-none shadow-2xs"
@@ -149,9 +163,9 @@ export const OrderList = () => {
 
           <button
             onClick={() => setIsCreateOrderOpen(true)}
-            className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition-colors"
+            className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition-colors shrink-0 cursor-pointer"
           >
-            <Plus className="w-4 h-4" />
+            <Plus className="w-3.5 h-3.5" />
             <span>Create Order</span>
           </button>
         </div>
@@ -174,7 +188,7 @@ export const OrderList = () => {
             <table className="w-full text-left text-xs min-w-[580px]">
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50/50 text-slate-400 font-semibold uppercase tracking-wider text-[11px]">
-                  <th className="py-3 px-5">Bill #</th>
+                  <th className="py-3 px-5">Order #</th>
                   <th className="py-3 px-5">Customer</th>
                   <th className="py-3 px-5">Items</th>
                   <th className="py-3 px-5 text-right">Total</th>
@@ -183,81 +197,69 @@ export const OrderList = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50 text-slate-700">
-                {orders.map((order) => (
-                  <tr key={order._id} className="hover:bg-slate-50/40 transition-colors">
-                    <td className="py-4 px-5 font-mono font-medium text-slate-900">
-                      {order.billNumber}
-                    </td>
+                {orders.map((order) => {
+                  const orderNum = formatOrderNumber(order.billNumber);
+                  return (
+                    <tr key={order._id} className="hover:bg-slate-50/40 transition-colors">
+                      <td className="py-4 px-5 font-mono font-bold text-slate-900">
+                        #{orderNum}
+                      </td>
 
-                    <td className="py-4 px-5">
-                      <div className="font-semibold text-slate-900">{order.customer?.name}</div>
-                      <div className="text-[11px] text-slate-400">{order.customer?.phone}</div>
-                    </td>
+                      <td className="py-4 px-5">
+                        <div className="font-semibold text-slate-900">{order.customer?.name}</div>
+                        <div className="text-[11px] text-slate-400">{order.customer?.phone}</div>
+                      </td>
 
-                    <td className="py-4 px-5 text-slate-600">
-                      {order.items?.length || 0} item{(order.items?.length || 0) > 1 ? 's' : ''}
-                    </td>
+                      <td className="py-4 px-5 text-slate-600">
+                        {order.items?.length || 0} item{(order.items?.length || 0) > 1 ? 's' : ''}
+                      </td>
 
-                    <td className="py-4 px-5 text-right font-mono font-bold text-slate-900 text-sm">
-                      ₹{(order.totalAmount || 0).toLocaleString()}
-                    </td>
+                      <td className="py-4 px-5 text-right font-mono font-bold text-slate-900 text-sm">
+                        ₹{(order.totalAmount || 0).toLocaleString()}
+                      </td>
 
-                    <td className="py-4 px-5 text-center">
-                      <select
-                        value={order.status}
-                        onChange={(e) => handleStatusChange(order._id, e.target.value)}
-                        className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-xs text-slate-800 font-medium outline-none cursor-pointer"
-                      >
-                        <option value="Pending">Pending</option>
-                        <option value="Processing">Processing</option>
-                        <option value="Shipped">Shipped</option>
-                        <option value="Delivered">Delivered</option>
-                        <option value="Cancelled">Cancelled</option>
-                      </select>
-                    </td>
-
-                    <td className="py-4 px-5 text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <button
-                          onClick={() => {
-                            let phone = (order.customer?.phone || '').replace(/\D/g, '').replace(/^0+/, '');
-                            if (phone.length === 10) phone = `91${phone}`;
-                            const itemsText = (order.items || [])
-                              .map(
-                                (it, idx) =>
-                                  `${idx + 1}. *${it.name}* (${it.size || 'M'}${it.color ? `, ${it.color}` : ''}) x ${it.quantity} = ₹${(it.total || 0).toLocaleString()}`
-                              )
-                              .join('\n');
-                            const msg = `*LUFO CLOTHING — INVOICE ${order.billNumber}*\nDate: ${new Date(order.orderDate || order.createdAt).toLocaleDateString()}\nCustomer: ${order.customer?.name || ''}\n\n*ITEMS:*\n${itemsText}\n\n*Total Amount:* ₹${(order.totalAmount || 0).toLocaleString()}\nStatus: ${order.status}\n\nThank you for choosing LUFO Clothing!`;
-                            const url = phone
-                              ? `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`
-                              : `https://wa.me/?text=${encodeURIComponent(msg)}`;
-                            window.open(url, '_blank');
-                            showToast(`Opening WhatsApp chat with ${order.customer?.name || 'Customer'}...`);
-                          }}
-                          className="p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-50 transition-colors"
-                          title="Share Invoice via WhatsApp"
+                      <td className="py-4 px-5 text-center">
+                        <select
+                          value={order.status}
+                          onChange={(e) => handleStatusChange(order._id, e.target.value)}
+                          className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-xs text-slate-800 font-medium outline-none cursor-pointer"
                         >
-                          <MessageSquare className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => setSelectedInvoiceOrder(order)}
-                          className="p-1.5 rounded-lg text-amber-700 hover:bg-amber-50 transition-colors"
-                          title="View Bill"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(order._id, order.billNumber)}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
-                          title="Delete"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                          <option value="Pending">Pending</option>
+                          <option value="Processing">Processing</option>
+                          <option value="Shipped">Shipped</option>
+                          <option value="Delivered">Delivered</option>
+                          <option value="Cancelled">Cancelled</option>
+                        </select>
+                      </td>
+
+                      <td className="py-4 px-5 text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            onClick={() => setSelectedInvoiceOrder(order)}
+                            className="p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-50 transition-colors cursor-pointer"
+                            title="Share Bill Image via WhatsApp / Apps"
+                          >
+                            <MessageSquare className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => setSelectedInvoiceOrder(order)}
+                            className="p-1.5 rounded-lg text-amber-700 hover:bg-amber-50 transition-colors cursor-pointer"
+                            title="View / Download Bill Image"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(order._id, order.billNumber)}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                            title="Delete"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

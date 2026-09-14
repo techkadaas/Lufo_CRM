@@ -2,6 +2,7 @@ import React from 'react';
 import { useApp } from '../../context/AppContext';
 import { OrderStatusBadge } from '../orders/OrderStatusBadge';
 import { Eye, ArrowRight } from 'lucide-react';
+import { formatOrderNumber } from '../orders/OrderInvoiceModal';
 
 export const RecentOrdersTable = ({ recentOrders = [] }) => {
   const { setActiveTab, setSelectedInvoiceOrder } = useApp();
@@ -12,7 +13,7 @@ export const RecentOrdersTable = ({ recentOrders = [] }) => {
         <h3 className="text-base font-bold text-slate-900">Recent Orders</h3>
         <button
           onClick={() => setActiveTab('orders')}
-          className="text-xs text-amber-700 hover:text-amber-800 font-semibold flex items-center gap-1"
+          className="text-xs text-amber-700 hover:text-amber-800 font-semibold flex items-center gap-1 cursor-pointer"
         >
           <span>View all</span>
           <ArrowRight className="w-3.5 h-3.5" />
@@ -23,7 +24,7 @@ export const RecentOrdersTable = ({ recentOrders = [] }) => {
         <table className="w-full text-left text-xs min-w-[420px]">
           <thead>
             <tr className="border-b border-slate-100 text-slate-400 font-semibold">
-              <th className="pb-3">Bill</th>
+              <th className="pb-3">Order #</th>
               <th className="pb-3">Customer</th>
               <th className="pb-3 text-right">Amount</th>
               <th className="pb-3 text-center">Status</th>
@@ -40,7 +41,7 @@ export const RecentOrdersTable = ({ recentOrders = [] }) => {
             ) : (
               recentOrders.map((order) => (
                 <tr key={order._id} className="hover:bg-slate-50/50">
-                  <td className="py-3 font-mono font-medium text-slate-900">{order.billNumber}</td>
+                  <td className="py-3 font-mono font-bold text-slate-900">#{formatOrderNumber(order.billNumber)}</td>
                   <td className="py-3 font-medium text-slate-700">{order.customer?.name}</td>
                   <td className="py-3 text-right font-mono font-bold text-slate-900">
                     ₹{(order.totalAmount || 0).toLocaleString()}

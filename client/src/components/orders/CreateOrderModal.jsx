@@ -26,6 +26,7 @@ import {
   ArrowLeft,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { formatOrderNumber } from './OrderInvoiceModal';
 
 export const CreateOrderModal = ({ isOpen, onClose }) => {
   const { showToast, triggerRefresh, setSelectedInvoiceOrder } = useApp();
@@ -102,7 +103,7 @@ export const CreateOrderModal = ({ isOpen, onClose }) => {
     const timer = setTimeout(async () => {
       try {
         setCustomerStatus((prev) => ({ ...prev, loading: true }));
-        const res = await api.lookupCustomer(customer.phone);
+        const res = await api.lookupCustomer(cleanDigits);
         if (res.success && res.exists && res.data) {
           setCustomerStatus({
             checked: true,
@@ -110,12 +111,12 @@ export const CreateOrderModal = ({ isOpen, onClose }) => {
             loading: false,
             data: res.data,
           });
-          // Auto-fill customer details from past records
+          // Pre-populate missing customer fields if available
           setCustomer((prev) => ({
             ...prev,
-            name: res.data.customer?.name || prev.name,
-            address: res.data.customer?.address || prev.address,
-            email: res.data.customer?.email || prev.email,
+            name: prev.name || res.data.customer.name || '',
+            address: prev.address || res.data.customer.address || '',
+            email: prev.email || res.data.customer.email || '',
           }));
         } else {
           setCustomerStatus({
@@ -129,48 +130,12 @@ export const CreateOrderModal = ({ isOpen, onClose }) => {
       } catch (err) {
         setCustomerStatus({ checked: true, exists: false, loading: false, data: null });
       }
-    }, 350);
+    }, 400);
 
     return () => clearTimeout(timer);
   }, [customer.phone]);
 
-  const handleStockSelect = (index, selectedStockId) => {
-    const selected = stocksList.find((s) => s._id === selectedStockId);
-    const newItems = [...items];
-    if (selected) {
-      newItems[index] = {
-        ...newItems[index],
-        stockId: selected._id,
-        name: selected.name,
-        sku: selected.sku,
-        size: selected.size,
-        color: selected.color,
-        price: selected.sellingPrice,
-        quantity: 1,
-        total: selected.sellingPrice,
-      };
-    } else {
-      newItems[index] = {
-        ...newItems[index],
-        stockId: '',
-      };
-    }
-    setItems(newItems);
-  };
-
-  const handleItemChange = (index, field, value) => {
-    const newItems = [...items];
-    newItems[index][field] = value;
-
-    if (field === 'price' || field === 'quantity') {
-      const price = field === 'price' ? Number(value) : Number(newItems[index].price);
-      const quantity = field === 'quantity' ? Number(value) : Number(newItems[index].quantity);
-      newItems[index].total = Math.max(0, price * quantity);
-    }
-    setItems(newItems);
-  };
-
-  const addItemRow = () => {
+  const handleAddItem = () => {
     setItems([
       ...items,
       {
@@ -186,54 +151,75 @@ export const CreateOrderModal = ({ isOpen, onClose }) => {
     ]);
   };
 
-  const removeItemRow = (index) => {
-    if (items.length === 1) return;
-    setItems(items.filter((_, i) => i !== index));
+  const handleRemoveItem = (index) => {
+    if (items.length <= 1) return;
+    setItems(items.filter((_, idx) => idx !== index));
+  };
+
+  const handleItemChange = (index, field, value) => {
+    const updated = [...items];
+    const item = { ...updated[index], [field]: value };
+
+    if (field === 'price' || field === 'quantity') {
+      const p = field === 'price' ? Number(value) || 0 : item.price;
+      const q = field === 'quantity' ? Number(value) || 1 : item.quantity;
+      item.total = p * q;
+    }
+
+    updated[index] = item;
+    setItems(updated);
+  };
+
+  const handleSelectStock = (index, stockId) => {
+    const stock = stocksList.find((s) => (s._id || s.id)?.toString() === stockId.toString());
+    if (!stock) return;
+
+    const updated = [...items];
+    updated[index] = {
+      ...updated[index],
+      stockId: stock._id || stock.id,
+      name: stock.name,
+      sku: stock.sku,
+      price: stock.sellingPrice || 0,
+      size: (stock.sizes && stock.sizes[0]) || 'M',
+      color: (stock.colors && stock.colors[0]) || '',
+      quantity: 1,
+      total: (stock.sellingPrice || 0) * 1,
+    };
+    setItems(updated);
   };
 
   // Computations
-  const subtotal = items.reduce((acc, item) => acc + (Number(item.total) || 0), 0);
-  const totalAmount = Math.max(0, Number((subtotal - (Number(discount) || 0)).toFixed(2)));
+  const subtotal = items.reduce((sum, item) => sum + (Number(item.total) || 0), 0);
+  const totalAmount = Math.max(0, subtotal - (Number(discount) || 0));
 
   // Navigation handlers between Step 1 and Step 2
-  const handleProceedToStep2 = (e) => {
+  const handleNextStep = (e) => {
     if (e) e.preventDefault();
-    if (!customer.phone.trim()) {
-      showToast('Please enter customer mobile number', 'warning');
+    if (!customer.name.trim()) {
+      showToast('Customer name is required', 'error');
       return;
     }
-    if (!customer.name.trim()) {
-      showToast('Please enter customer name', 'warning');
+    if (!customer.phone.trim()) {
+      showToast('Customer phone is required', 'error');
       return;
     }
     setStep(2);
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    if (!customer.phone.trim()) {
-      showToast('Customer mobile number is required', 'warning');
-      setStep(1);
-      return;
-    }
-
-    if (!customer.name.trim()) {
-      showToast('Please enter customer name', 'warning');
-      setStep(1);
-      return;
-    }
+  const handleSubmitOrder = async (e) => {
+    if (e) e.preventDefault();
 
     const validItems = items.filter((it) => it.name.trim() && it.price > 0);
     if (validItems.length === 0) {
-      showToast('Please add at least one valid product with name and price', 'warning');
+      showToast('Add at least one item with valid price', 'error');
       return;
     }
 
     try {
       setLoading(true);
       const payload = {
-        billNumber,
+        billNumber: billNumber || undefined,
         customer: {
           name: customer.name.trim(),
           phone: customer.phone.trim(),
@@ -273,7 +259,8 @@ export const CreateOrderModal = ({ isOpen, onClose }) => {
           localStorage.setItem('lufo_crm_cached_orders', JSON.stringify(updated));
         } catch (e) {}
 
-        showToast(`Order & Bill ${res.data.billNumber} created successfully!`);
+        const orderNum = formatOrderNumber(res.data.billNumber);
+        showToast(`Order #${orderNum} created successfully!`);
         triggerRefresh();
         onClose();
         // Prompt invoice preview
@@ -301,8 +288,8 @@ export const CreateOrderModal = ({ isOpen, onClose }) => {
           <div className="flex items-center justify-between mb-2.5 px-1">
             <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50/90 border border-amber-200/80 text-amber-900 text-xs font-medium shadow-2xs">
               <Receipt className="w-3.5 h-3.5 text-amber-600" />
-              <span className="text-[11px] text-slate-500 font-semibold">Bill No:</span>
-              <span className="font-mono font-bold text-amber-950">{billNumber || 'Generating...'}</span>
+              <span className="text-[11px] text-slate-500 font-semibold">Order No:</span>
+              <span className="font-mono font-bold text-amber-950">#{formatOrderNumber(billNumber) || '01'}</span>
             </div>
             <div className="text-[11px] font-semibold text-slate-400">
               Step <span className="text-amber-800 font-bold">{step}</span> of 2

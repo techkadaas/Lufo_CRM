@@ -12,6 +12,7 @@ import orderRoutes from './routes/orderRoutes.js';
 import stockRoutes from './routes/stockRoutes.js';
 import expenseRoutes from './routes/expenseRoutes.js';
 import authRoutes from './routes/authRoutes.js';
+import partnerRoutes from './routes/partnerRoutes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -59,6 +60,7 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/stocks', stockRoutes);
 app.use('/api/expenses', expenseRoutes);
+app.use('/api/partners', partnerRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

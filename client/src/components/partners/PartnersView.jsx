@@ -55,90 +55,8 @@ export const PartnersView = () => {
       serverPartners = serverPartners.map((p) => ({ ...p, id: p._id || p.id, _id: p._id || p.id }));
       serverIncomes = serverIncomes.map((i) => ({ ...i, id: i._id || i.id, _id: i._id || i.id }));
 
-      // Seamless cloud sync: Sync any local partners or incomes not yet in the backend database
-      try {
-        const localP = JSON.parse(localStorage.getItem('lufo_crm_all_partners') || '[]');
-        const localI = JSON.parse(localStorage.getItem('lufo_crm_partner_incomes') || '[]');
-        
-        const partnerIdMap = {};
-        serverPartners.forEach((p) => {
-          if (p.name) partnerIdMap[(p.name || '').trim().toLowerCase()] = p._id || p.id;
-        });
-
-        // 1. Sync missing partners
-        for (const p of localP) {
-          if (['ptn-1', 'ptn-2', 'ptn-3'].includes(p.id) || ['Rahul Sharma', 'Vikramaditya Verma', 'Priya Nambiar'].includes(p.name)) continue;
-          const pKey = (p.name || '').trim().toLowerCase();
-          if (!pKey) continue;
-
-          let existingServerPartner = serverPartners.find((sp) => (sp.name || '').trim().toLowerCase() === pKey);
-          if (!existingServerPartner) {
-            try {
-              const res = await api.createPartner({
-                name: p.name,
-                phone: p.phone || '',
-                email: p.email || '',
-                role: p.role || 'Partner',
-                status: p.status || 'Active',
-                notes: p.notes || '',
-              });
-              if (res.success && res.data) {
-                const newId = res.data._id || res.data.id;
-                partnerIdMap[p.id] = newId;
-                partnerIdMap[pKey] = newId;
-                serverPartners.push({ ...res.data, id: newId, _id: newId });
-              }
-            } catch (e) {}
-          } else {
-            partnerIdMap[p.id] = existingServerPartner._id || existingServerPartner.id;
-          }
-        }
-
-        // 2. Sync missing partner incomes
-        if (localI.length > 0) {
-          for (const inc of localI) {
-            if (['inc-1', 'inc-2', 'inc-3', 'inc-4', 'inc-5'].includes(inc.id)) continue;
-            let targetPartnerId = partnerIdMap[inc.partnerId];
-            if (!targetPartnerId) {
-              const foundLocalP = localP.find((p) => p.id === inc.partnerId);
-              if (foundLocalP) {
-                targetPartnerId = partnerIdMap[(foundLocalP.name || '').trim().toLowerCase()];
-              }
-            }
-            if (!targetPartnerId) targetPartnerId = inc.partnerId;
-
-            const isAlreadyOnServer = serverIncomes.some(
-              (si) =>
-                (si.partnerId === targetPartnerId || si.partnerId === inc.partnerId) &&
-                Number(si.amount) === Number(inc.amount) &&
-                (si.date === inc.date || (si.date && inc.date && new Date(si.date).toDateString() === new Date(inc.date).toDateString()))
-            );
-
-            if (!isAlreadyOnServer && Number(inc.amount) > 0) {
-              try {
-                const res = await api.createPartnerIncome({
-                  partnerId: targetPartnerId,
-                  amount: Number(inc.amount) || 0,
-                  date: inc.date || new Date().toISOString(),
-                  paymentMode: inc.paymentMode || 'UPI',
-                  purpose: inc.purpose || 'General Business Purchase / Capital Inflow',
-                  referenceNo: inc.referenceNo || '',
-                });
-                if (res.success && res.data) {
-                  const newIncId = res.data._id || res.data.id;
-                  serverIncomes.push({ ...res.data, id: newIncId, _id: newIncId });
-                }
-              } catch (e) {}
-            }
-          }
-        }
-
-        // Keep local cache synced
-        localStorage.setItem('lufo_crm_all_partners', JSON.stringify(serverPartners));
-        localStorage.setItem('lufo_crm_partner_incomes', JSON.stringify(serverIncomes));
-      } catch (migrationErr) {
-        console.warn('Partner migration notice:', migrationErr);
-      }
+      localStorage.setItem('lufo_crm_all_partners', JSON.stringify(serverPartners));
+      localStorage.setItem('lufo_crm_partner_incomes', JSON.stringify(serverIncomes));
 
       setPartners(serverPartners);
       setIncomes(serverIncomes);
@@ -175,14 +93,16 @@ export const PartnersView = () => {
         const id = editingPartner.id || editingPartner._id;
         const res = await api.updatePartner(id, partnerData);
         if (res.success) {
-          showToast('Partner details updated successfully');
-          fetchPartnersAndIncomes();
+          showToast('Partner details updated successfully', 'success');
+          await fetchPartnersAndIncomes();
+          window.dispatchEvent(new CustomEvent('lufo_partners_updated'));
         }
       } else {
         const res = await api.createPartner(partnerData);
         if (res.success) {
-          showToast('New partner added successfully');
-          fetchPartnersAndIncomes();
+          showToast('New partner added successfully', 'success');
+          await fetchPartnersAndIncomes();
+          window.dispatchEvent(new CustomEvent('lufo_partners_updated'));
         }
       }
     } catch (err) {
@@ -202,8 +122,14 @@ export const PartnersView = () => {
     try {
       const res = await api.deletePartner(id);
       if (res.success) {
-        showToast(`Partner "${name}" and their records removed`);
-        fetchPartnersAndIncomes();
+        showToast(`Partner "${name}" and their records removed`, 'success');
+        const updatedPartners = partners.filter((p) => (p.id || p._id)?.toString() !== id.toString());
+        const updatedIncomes = incomes.filter((i) => (i.partnerId || '').toString() !== id.toString());
+        setPartners(updatedPartners);
+        setIncomes(updatedIncomes);
+        localStorage.setItem('lufo_crm_all_partners', JSON.stringify(updatedPartners));
+        localStorage.setItem('lufo_crm_partner_incomes', JSON.stringify(updatedIncomes));
+        window.dispatchEvent(new CustomEvent('lufo_partners_updated'));
       }
     } catch (err) {
       showToast(err.message || 'Failed to delete partner', 'error');
@@ -217,9 +143,11 @@ export const PartnersView = () => {
       if (res.success) {
         const partner = partners.find((p) => (p.id || p._id)?.toString() === (incomeData.partnerId)?.toString());
         showToast(
-          `Recorded ₹${Number(incomeData.amount).toLocaleString()} from ${partner ? partner.name : 'Partner'}`
+          `Recorded ₹${Number(incomeData.amount).toLocaleString()} from ${partner ? partner.name : 'Partner'}`,
+          'success'
         );
-        fetchPartnersAndIncomes();
+        await fetchPartnersAndIncomes();
+        window.dispatchEvent(new CustomEvent('lufo_partners_updated'));
       }
     } catch (err) {
       showToast(err.message || 'Failed to record income', 'error');
@@ -231,8 +159,11 @@ export const PartnersView = () => {
     try {
       const res = await api.deletePartnerIncome(id);
       if (res.success) {
-        showToast('Income entry deleted');
-        fetchPartnersAndIncomes();
+        showToast('Income entry deleted', 'success');
+        const updatedIncomes = incomes.filter((i) => (i.id || i._id)?.toString() !== id.toString());
+        setIncomes(updatedIncomes);
+        localStorage.setItem('lufo_crm_partner_incomes', JSON.stringify(updatedIncomes));
+        window.dispatchEvent(new CustomEvent('lufo_partners_updated'));
       }
     } catch (err) {
       showToast(err.message || 'Failed to delete income entry', 'error');

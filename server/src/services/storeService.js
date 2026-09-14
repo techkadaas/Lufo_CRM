@@ -993,10 +993,18 @@ export const Store = {
   },
 
   async deletePartner(id) {
+    let deleted = null;
     if (getDBStatus()) {
       try {
-        await Partner.findByIdAndDelete(id);
-        await PartnerIncome.deleteMany({ partnerId: id.toString() });
+        if (mongoose.Types.ObjectId.isValid(id)) {
+          deleted = await Partner.findByIdAndDelete(id);
+        }
+        if (!deleted) {
+          deleted = await Partner.findOneAndDelete({ $or: [{ _id: id }, { id: id }] });
+        }
+        await PartnerIncome.deleteMany({
+          $or: [{ partnerId: id.toString() }, { partnerId: id }],
+        });
       } catch (e) {
         console.warn('DB deletePartner fallback:', e.message);
       }
@@ -1061,9 +1069,15 @@ export const Store = {
   },
 
   async deletePartnerIncome(id) {
+    let deleted = null;
     if (getDBStatus()) {
       try {
-        await PartnerIncome.findByIdAndDelete(id);
+        if (mongoose.Types.ObjectId.isValid(id)) {
+          deleted = await PartnerIncome.findByIdAndDelete(id);
+        }
+        if (!deleted) {
+          deleted = await PartnerIncome.findOneAndDelete({ $or: [{ _id: id }, { id: id }] });
+        }
       } catch (e) {
         console.warn('DB deletePartnerIncome fallback:', e.message);
       }

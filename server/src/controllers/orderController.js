@@ -58,6 +58,9 @@ export const createOrder = async (req, res) => {
     } else {
       const existing = await Store.getOrderByBillNumber(orderData.billNumber);
       if (existing) {
+        if (orderData._isSync) {
+          return res.status(200).json({ success: true, message: 'Order already exists', data: existing });
+        }
         orderData.billNumber = await generateBillNumber();
       }
     }

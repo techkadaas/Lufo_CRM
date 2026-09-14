@@ -48,7 +48,8 @@ export const OrderList = () => {
             // Auto-sync any orphaned local orders up to the server so ALL users can see them
             for (const missing of missingLocals) {
               try {
-                const syncRes = await api.createOrder(missing);
+                const { _id, id, ...cleanMissing } = missing;
+                const syncRes = await api.createOrder({ ...cleanMissing, _isSync: true });
                 if (syncRes.success && syncRes.data) {
                   currentOrders = [syncRes.data, ...currentOrders];
                 }

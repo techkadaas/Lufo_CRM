@@ -68,15 +68,7 @@ export const SettingsPage = () => {
   const [partners, setPartners] = useState(() => {
     try {
       const saved = localStorage.getItem('lufo_crm_all_partners');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        return parsed.filter(
-          (p) =>
-            !['ptn-1', 'ptn-2', 'ptn-3'].includes(p.id) &&
-            !['Rahul Sharma', 'Vikramaditya Verma', 'Priya Nambiar'].includes(p.name)
-        );
-      }
-      return [];
+      return saved ? JSON.parse(saved) : [];
     } catch {
       return [];
     }
@@ -85,15 +77,7 @@ export const SettingsPage = () => {
   const [incomes, setIncomes] = useState(() => {
     try {
       const saved = localStorage.getItem('lufo_crm_partner_incomes');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        return parsed.filter(
-          (i) =>
-            !['inc-1', 'inc-2', 'inc-3', 'inc-4', 'inc-5'].includes(i.id) &&
-            !['ptn-1', 'ptn-2', 'ptn-3'].includes(i.partnerId)
-        );
-      }
-      return [];
+      return saved ? JSON.parse(saved) : [];
     } catch {
       return [];
     }
@@ -110,17 +94,114 @@ export const SettingsPage = () => {
 
   const isAdmin = user?.role === 'admin';
 
+  const fetchPartnersAndIncomes = async () => {
+    try {
+      const [partnersRes, incomesRes] = await Promise.all([
+        api.getPartners(),
+        api.getPartnerIncomes(),
+      ]);
+
+      let serverPartners = partnersRes.success ? (partnersRes.data || []) : [];
+      let serverIncomes = incomesRes.success ? (incomesRes.data || []) : [];
+
+      serverPartners = serverPartners.map((p) => ({ ...p, id: p._id || p.id, _id: p._id || p.id }));
+      serverIncomes = serverIncomes.map((i) => ({ ...i, id: i._id || i.id, _id: i._id || i.id }));
+
+      // Push local data if missing in DB
+      try {
+        const localP = JSON.parse(localStorage.getItem('lufo_crm_all_partners') || '[]');
+        const localI = JSON.parse(localStorage.getItem('lufo_crm_partner_incomes') || '[]');
+        const partnerIdMap = {};
+        serverPartners.forEach((p) => {
+          if (p.name) partnerIdMap[(p.name || '').trim().toLowerCase()] = p._id || p.id;
+        });
+
+        for (const p of localP) {
+          if (['ptn-1', 'ptn-2', 'ptn-3'].includes(p.id) || ['Rahul Sharma', 'Vikramaditya Verma', 'Priya Nambiar'].includes(p.name)) continue;
+          const pKey = (p.name || '').trim().toLowerCase();
+          if (!pKey) continue;
+          let existingServerPartner = serverPartners.find((sp) => (sp.name || '').trim().toLowerCase() === pKey);
+          if (!existingServerPartner) {
+            try {
+              const res = await api.createPartner({
+                name: p.name,
+                phone: p.phone || '',
+                email: p.email || '',
+                role: p.role || 'Partner',
+                status: p.status || 'Active',
+                notes: p.notes || '',
+              });
+              if (res.success && res.data) {
+                const newId = res.data._id || res.data.id;
+                partnerIdMap[p.id] = newId;
+                partnerIdMap[pKey] = newId;
+                serverPartners.push({ ...res.data, id: newId, _id: newId });
+              }
+            } catch (e) {}
+          } else {
+            partnerIdMap[p.id] = existingServerPartner._id || existingServerPartner.id;
+          }
+        }
+
+        if (localI.length > 0) {
+          for (const inc of localI) {
+            if (['inc-1', 'inc-2', 'inc-3', 'inc-4', 'inc-5'].includes(inc.id)) continue;
+            let targetPartnerId = partnerIdMap[inc.partnerId];
+            if (!targetPartnerId) {
+              const foundLocalP = localP.find((p) => p.id === inc.partnerId);
+              if (foundLocalP) {
+                targetPartnerId = partnerIdMap[(foundLocalP.name || '').trim().toLowerCase()];
+              }
+            }
+            if (!targetPartnerId) targetPartnerId = inc.partnerId;
+
+            const isAlreadyOnServer = serverIncomes.some(
+              (si) =>
+                (si.partnerId === targetPartnerId || si.partnerId === inc.partnerId) &&
+                Number(si.amount) === Number(inc.amount) &&
+                (si.date === inc.date || (si.date && inc.date && new Date(si.date).toDateString() === new Date(inc.date).toDateString()))
+            );
+
+            if (!isAlreadyOnServer && Number(inc.amount) > 0) {
+              try {
+                const res = await api.createPartnerIncome({
+                  partnerId: targetPartnerId,
+                  amount: Number(inc.amount) || 0,
+                  date: inc.date || new Date().toISOString(),
+                  paymentMode: inc.paymentMode || 'UPI',
+                  purpose: inc.purpose || 'General Business Purchase / Capital Inflow',
+                  referenceNo: inc.referenceNo || '',
+                });
+                if (res.success && res.data) {
+                  const newIncId = res.data._id || res.data.id;
+                  serverIncomes.push({ ...res.data, id: newIncId, _id: newIncId });
+                }
+              } catch (e) {}
+            }
+          }
+        }
+
+        localStorage.setItem('lufo_crm_all_partners', JSON.stringify(serverPartners));
+        localStorage.setItem('lufo_crm_partner_incomes', JSON.stringify(serverIncomes));
+      } catch (e) {}
+
+      setPartners(serverPartners);
+      setIncomes(serverIncomes);
+    } catch (e) {
+      console.warn('Error fetching partners in Settings:', e);
+    }
+  };
+
+  useEffect(() => {
+    if (isAdmin) {
+      fetchPartnersAndIncomes();
+    }
+  }, [isAdmin]);
+
   // Cross-component sync for partners & incomes
   useEffect(() => {
     const handleSync = () => {
-      try {
-        const savedP = localStorage.getItem('lufo_crm_all_partners');
-        if (savedP) setPartners(JSON.parse(savedP));
-        const savedI = localStorage.getItem('lufo_crm_partner_incomes');
-        if (savedI) setIncomes(JSON.parse(savedI));
-      } catch (e) {
-        console.error('Error syncing partners data in settings:', e);
-      }
+      fetchPartnersAndIncomes();
     };
     window.addEventListener('lufo_partners_updated', handleSync);
     window.addEventListener('storage', handleSync);
@@ -130,41 +211,31 @@ export const SettingsPage = () => {
     };
   }, []);
 
-  const savePartnersToStorage = (updatedPartners) => {
-    setPartners(updatedPartners);
-    localStorage.setItem('lufo_crm_all_partners', JSON.stringify(updatedPartners));
-    window.dispatchEvent(new CustomEvent('lufo_partners_updated'));
-  };
-
-  const saveIncomesToStorage = (updatedIncomes) => {
-    setIncomes(updatedIncomes);
-    localStorage.setItem('lufo_crm_partner_incomes', JSON.stringify(updatedIncomes));
-    window.dispatchEvent(new CustomEvent('lufo_partners_updated'));
-  };
-
   // Partner Handlers
-  const handleSavePartner = (partnerData) => {
-    if (editingPartner) {
-      const updated = partners.map((p) =>
-        p.id === editingPartner.id ? { ...p, ...partnerData } : p
-      );
-      savePartnersToStorage(updated);
-      showToast('Partner details updated successfully', 'success');
-    } else {
-      const newPartner = {
-        id: `ptn-${Date.now()}`,
-        createdAt: new Date().toISOString(),
-        ...partnerData,
-      };
-      const updated = [...partners, newPartner];
-      savePartnersToStorage(updated);
-      showToast(`Partner "${partnerData.name}" added successfully`, 'success');
+  const handleSavePartner = async (partnerData) => {
+    try {
+      if (editingPartner) {
+        const id = editingPartner._id || editingPartner.id;
+        const res = await api.updatePartner(id, partnerData);
+        if (res.success) {
+          showToast('Partner details updated successfully', 'success');
+        }
+      } else {
+        const res = await api.createPartner(partnerData);
+        if (res.success) {
+          showToast(`Partner "${partnerData.name}" added successfully`, 'success');
+        }
+      }
+      await fetchPartnersAndIncomes();
+      window.dispatchEvent(new CustomEvent('lufo_partners_updated'));
+    } catch (err) {
+      showToast(err.message || 'Failed to save partner', 'error');
     }
     setEditingPartner(null);
     setIsAddPartnerOpen(false);
   };
 
-  const handleDeletePartner = (id, name) => {
+  const handleDeletePartner = async (id, name) => {
     if (
       !window.confirm(
         `Are you sure you want to remove partner "${name}"? This will also remove their recorded capital/income entries.`
@@ -172,33 +243,47 @@ export const SettingsPage = () => {
     )
       return;
 
-    const updatedPartners = partners.filter((p) => p.id !== id);
-    const updatedIncomes = incomes.filter((i) => i.partnerId !== id);
-    savePartnersToStorage(updatedPartners);
-    saveIncomesToStorage(updatedIncomes);
-    showToast(`Partner "${name}" and their records removed`, 'success');
+    try {
+      const res = await api.deletePartner(id);
+      if (res.success) {
+        showToast(`Partner "${name}" and their records removed`, 'success');
+        await fetchPartnersAndIncomes();
+        window.dispatchEvent(new CustomEvent('lufo_partners_updated'));
+      }
+    } catch (err) {
+      showToast(err.message || 'Failed to delete partner', 'error');
+    }
   };
 
-  const handleSaveIncome = (incomeData) => {
-    const newIncome = {
-      id: `inc-${Date.now()}`,
-      ...incomeData,
-    };
-    const updated = [newIncome, ...incomes];
-    saveIncomesToStorage(updated);
-
-    const p = partners.find((x) => x.id === incomeData.partnerId);
-    showToast(
-      `Recorded ₹${Number(incomeData.amount).toLocaleString()} from ${p ? p.name : 'Partner'}`,
-      'success'
-    );
+  const handleSaveIncome = async (incomeData) => {
+    try {
+      const res = await api.createPartnerIncome(incomeData);
+      if (res.success) {
+        const p = partners.find((x) => (x.id === incomeData.partnerId || x._id === incomeData.partnerId));
+        showToast(
+          `Recorded ₹${Number(incomeData.amount).toLocaleString()} from ${p ? p.name : 'Partner'}`,
+          'success'
+        );
+        await fetchPartnersAndIncomes();
+        window.dispatchEvent(new CustomEvent('lufo_partners_updated'));
+      }
+    } catch (err) {
+      showToast(err.message || 'Failed to record partner income', 'error');
+    }
   };
 
-  const handleDeleteIncome = (id, amount) => {
+  const handleDeleteIncome = async (id, amount) => {
     if (!window.confirm(`Delete income record of ₹${(amount || 0).toLocaleString()}?`)) return;
-    const updated = incomes.filter((i) => i.id !== id);
-    saveIncomesToStorage(updated);
-    showToast('Income entry deleted', 'success');
+    try {
+      const res = await api.deletePartnerIncome(id);
+      if (res.success) {
+        showToast('Income entry deleted', 'success');
+        await fetchPartnersAndIncomes();
+        window.dispatchEvent(new CustomEvent('lufo_partners_updated'));
+      }
+    } catch (err) {
+      showToast(err.message || 'Failed to delete income record', 'error');
+    }
   };
 
   // Calculate stats for partner cards

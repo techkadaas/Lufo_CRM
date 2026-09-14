@@ -55,15 +55,24 @@ export const PartnersView = () => {
       serverPartners = serverPartners.map((p) => ({ ...p, id: p._id || p.id, _id: p._id || p.id }));
       serverIncomes = serverIncomes.map((i) => ({ ...i, id: i._id || i.id, _id: i._id || i.id }));
 
-      // Seamless migration: If server has no partners, check if localStorage had previous data and sync it to server
+      // Seamless cloud sync: Sync any local partners or incomes not yet in the backend database
       try {
         const localP = JSON.parse(localStorage.getItem('lufo_crm_all_partners') || '[]');
         const localI = JSON.parse(localStorage.getItem('lufo_crm_partner_incomes') || '[]');
         
-        if (serverPartners.length === 0 && localP.length > 0) {
-          const partnerIdMap = {};
-          for (const p of localP) {
-            if (['ptn-1', 'ptn-2', 'ptn-3'].includes(p.id)) continue;
+        const partnerIdMap = {};
+        serverPartners.forEach((p) => {
+          if (p.name) partnerIdMap[(p.name || '').trim().toLowerCase()] = p._id || p.id;
+        });
+
+        // 1. Sync missing partners
+        for (const p of localP) {
+          if (['ptn-1', 'ptn-2', 'ptn-3'].includes(p.id) || ['Rahul Sharma', 'Vikramaditya Verma', 'Priya Nambiar'].includes(p.name)) continue;
+          const pKey = (p.name || '').trim().toLowerCase();
+          if (!pKey) continue;
+
+          let existingServerPartner = serverPartners.find((sp) => (sp.name || '').trim().toLowerCase() === pKey);
+          if (!existingServerPartner) {
             try {
               const res = await api.createPartner({
                 name: p.name,
@@ -76,18 +85,39 @@ export const PartnersView = () => {
               if (res.success && res.data) {
                 const newId = res.data._id || res.data.id;
                 partnerIdMap[p.id] = newId;
+                partnerIdMap[pKey] = newId;
                 serverPartners.push({ ...res.data, id: newId, _id: newId });
               }
             } catch (e) {}
+          } else {
+            partnerIdMap[p.id] = existingServerPartner._id || existingServerPartner.id;
           }
+        }
 
-          if (serverIncomes.length === 0 && localI.length > 0) {
-            for (const inc of localI) {
-              if (['inc-1', 'inc-2', 'inc-3', 'inc-4', 'inc-5'].includes(inc.id)) continue;
-              const mappedPartnerId = partnerIdMap[inc.partnerId] || inc.partnerId;
+        // 2. Sync missing partner incomes
+        if (localI.length > 0) {
+          for (const inc of localI) {
+            if (['inc-1', 'inc-2', 'inc-3', 'inc-4', 'inc-5'].includes(inc.id)) continue;
+            let targetPartnerId = partnerIdMap[inc.partnerId];
+            if (!targetPartnerId) {
+              const foundLocalP = localP.find((p) => p.id === inc.partnerId);
+              if (foundLocalP) {
+                targetPartnerId = partnerIdMap[(foundLocalP.name || '').trim().toLowerCase()];
+              }
+            }
+            if (!targetPartnerId) targetPartnerId = inc.partnerId;
+
+            const isAlreadyOnServer = serverIncomes.some(
+              (si) =>
+                (si.partnerId === targetPartnerId || si.partnerId === inc.partnerId) &&
+                Number(si.amount) === Number(inc.amount) &&
+                (si.date === inc.date || (si.date && inc.date && new Date(si.date).toDateString() === new Date(inc.date).toDateString()))
+            );
+
+            if (!isAlreadyOnServer && Number(inc.amount) > 0) {
               try {
                 const res = await api.createPartnerIncome({
-                  partnerId: mappedPartnerId,
+                  partnerId: targetPartnerId,
                   amount: Number(inc.amount) || 0,
                   date: inc.date || new Date().toISOString(),
                   paymentMode: inc.paymentMode || 'UPI',
@@ -102,6 +132,10 @@ export const PartnersView = () => {
             }
           }
         }
+
+        // Keep local cache synced
+        localStorage.setItem('lufo_crm_all_partners', JSON.stringify(serverPartners));
+        localStorage.setItem('lufo_crm_partner_incomes', JSON.stringify(serverIncomes));
       } catch (migrationErr) {
         console.warn('Partner migration notice:', migrationErr);
       }

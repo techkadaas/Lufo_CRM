@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 import { Stock } from '../models/Stock.js';
 import { Order } from '../models/Order.js';
@@ -64,29 +65,7 @@ const loadFallbackUsers = () => {
     updatedAt: new Date().toISOString(),
   };
 
-  const defaultArapsa = {
-    _id: 'user_arapsa_staff',
-    name: 'Arapsa',
-    username: 'arapsa@lufo.com',
-    password: bcrypt.hashSync('Arapsa@lufo2', salt),
-    role: 'staff',
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
-
-  const defaultNajeer = {
-    _id: 'user_najeer_staff',
-    name: 'Najeer',
-    username: 'najeer@lufo.com',
-    password: bcrypt.hashSync('Najeer@lufo4', salt),
-    role: 'staff',
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
-
-  const initialUsers = [defaultAdmin, defaultStaff, defaultArapsa, defaultNajeer];
+  const initialUsers = [defaultAdmin, defaultStaff];
 
   try {
     fs.writeFileSync(USERS_FILE, JSON.stringify(initialUsers, null, 2), 'utf8');
@@ -508,14 +487,28 @@ export const Store = {
     }
 
     if (getDBStatus()) {
-      const order = new Order(data);
+      const cleanData = { ...data };
+      delete cleanData._id;
+      delete cleanData.id;
+      if (Array.isArray(cleanData.items)) {
+        cleanData.items = cleanData.items.map((item) => {
+          const cleanItem = { ...item };
+          delete cleanItem._id;
+          delete cleanItem.id;
+          if (cleanItem.stockId && !mongoose.Types.ObjectId.isValid(cleanItem.stockId)) {
+            delete cleanItem.stockId;
+          }
+          return cleanItem;
+        });
+      }
+      const order = new Order(cleanData);
       return await order.save();
     }
     const newOrder = {
       ...data,
-      _id: `mem_ord_${Date.now()}`,
+      _id: (data._id && !data._id.startsWith('mem_ord_')) ? data._id : `mem_ord_${Date.now()}`,
       orderDate: data.orderDate || new Date().toISOString(),
-      createdAt: new Date().toISOString(),
+      createdAt: data.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
     memOrders.unshift(newOrder);
@@ -959,7 +952,10 @@ export const Store = {
   async createPartner(data) {
     if (getDBStatus()) {
       try {
-        const newPartner = new Partner(data);
+        const cleanData = { ...data };
+        delete cleanData._id;
+        delete cleanData.id;
+        const newPartner = new Partner(cleanData);
         return await newPartner.save();
       } catch (e) {
         console.warn('DB createPartner fallback:', e.message);
@@ -969,7 +965,7 @@ export const Store = {
       ...data,
       _id: `ptn_${Date.now()}`,
       id: `ptn_${Date.now()}`,
-      createdAt: new Date().toISOString(),
+      createdAt: data.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
     memPartners.unshift(newPartner);
@@ -980,7 +976,10 @@ export const Store = {
   async updatePartner(id, data) {
     if (getDBStatus()) {
       try {
-        const updated = await Partner.findByIdAndUpdate(id, data, { new: true, runValidators: true });
+        const cleanData = { ...data };
+        delete cleanData._id;
+        delete cleanData.id;
+        const updated = await Partner.findByIdAndUpdate(id, cleanData, { new: true, runValidators: true });
         if (updated) return updated;
       } catch (e) {
         console.warn('DB updatePartner fallback:', e.message);
@@ -1039,7 +1038,10 @@ export const Store = {
   async createPartnerIncome(data) {
     if (getDBStatus()) {
       try {
-        const newIncome = new PartnerIncome(data);
+        const cleanData = { ...data };
+        delete cleanData._id;
+        delete cleanData.id;
+        const newIncome = new PartnerIncome(cleanData);
         return await newIncome.save();
       } catch (e) {
         console.warn('DB createPartnerIncome fallback:', e.message);
@@ -1050,7 +1052,7 @@ export const Store = {
       _id: `inc_${Date.now()}`,
       id: `inc_${Date.now()}`,
       date: data.date || new Date().toISOString(),
-      createdAt: new Date().toISOString(),
+      createdAt: data.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
     memPartnerIncomes.unshift(newIncome);

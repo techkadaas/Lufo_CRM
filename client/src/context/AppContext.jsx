@@ -69,6 +69,32 @@ export const AppProvider = ({ children }) => {
     setRefreshKey((prev) => prev + 1);
   }, []);
 
+  // Multi-device real-time sync: Auto-poll every 8 seconds & on window focus so insertions/deletions update on all open devices
+  useEffect(() => {
+    const interval = setInterval(() => {
+      triggerRefresh();
+    }, 8000);
+
+    const handleFocus = () => {
+      triggerRefresh();
+    };
+
+    const handleStorageSync = (e) => {
+      if (e.key && e.key.startsWith('lufo_crm_')) {
+        triggerRefresh();
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('storage', handleStorageSync);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('storage', handleStorageSync);
+    };
+  }, [triggerRefresh]);
+
   const toggleTheme = useCallback(() => {
     setTheme((prev) => (prev === 'light' ? 'dark' : 'light'));
   }, []);

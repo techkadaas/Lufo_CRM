@@ -20,22 +20,8 @@ export const ExpenseList = () => {
     try {
       setLoading(true);
       const res = await api.getExpenses({ search, category: categoryFilter });
-      let currentExpenses = res.success ? res.data : [];
-
-      try {
-        const cached = JSON.parse(localStorage.getItem('lufo_crm_cached_expenses') || '[]');
-        if (cached && cached.length > 0) {
-          const serverIds = new Set(currentExpenses.map((e) => e._id || e.receiptNumber));
-          const missingLocals = cached.filter((c) => !serverIds.has(c._id || c.receiptNumber));
-          if (missingLocals.length > 0) {
-            currentExpenses = [...missingLocals, ...currentExpenses];
-          }
-        }
-        if (currentExpenses.length > 0) {
-          localStorage.setItem('lufo_crm_cached_expenses', JSON.stringify(currentExpenses));
-        }
-      } catch (e) {}
-
+      const currentExpenses = res.success ? res.data : [];
+      localStorage.setItem('lufo_crm_cached_expenses', JSON.stringify(currentExpenses));
       setExpenses(currentExpenses);
     } catch (err) {
       try {

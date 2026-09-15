@@ -35,36 +35,8 @@ export const OrderList = () => {
         endDate: dateFilter.endDate,
       });
 
-      let currentOrders = res.success ? res.data : [];
-
-      // Resilient local cache merge and background sync to server
-      try {
-        const cached = JSON.parse(localStorage.getItem('lufo_crm_cached_orders') || '[]');
-        if (cached && cached.length > 0) {
-          const serverBills = new Set(currentOrders.map((o) => (o.billNumber || '').toUpperCase()));
-          const missingLocals = cached.filter((c) => c.billNumber && !serverBills.has(c.billNumber.toUpperCase()));
-          
-          if (missingLocals.length > 0) {
-            // Auto-sync any orphaned local orders up to the server so ALL users can see them
-            for (const missing of missingLocals) {
-              try {
-                const { _id, id, ...cleanMissing } = missing;
-                const syncRes = await api.createOrder({ ...cleanMissing, _isSync: true });
-                if (syncRes.success && syncRes.data) {
-                  currentOrders = [syncRes.data, ...currentOrders];
-                }
-              } catch (e) {
-                // If already on server or error, fallback include in current view
-                currentOrders = [missing, ...currentOrders];
-              }
-            }
-          }
-        }
-        if (currentOrders.length > 0) {
-          localStorage.setItem('lufo_crm_cached_orders', JSON.stringify(currentOrders));
-        }
-      } catch (e) {}
-
+      const currentOrders = res.success ? res.data : [];
+      localStorage.setItem('lufo_crm_cached_orders', JSON.stringify(currentOrders));
       setOrders(currentOrders);
     } catch (err) {
       try {

@@ -24,22 +24,8 @@ export const StockList = () => {
     try {
       setLoading(true);
       const res = await api.getStocks({ search, category: categoryFilter });
-      let currentStocks = res.success ? res.data : [];
-
-      try {
-        const cached = JSON.parse(localStorage.getItem('lufo_crm_cached_stocks') || '[]');
-        if (cached && cached.length > 0) {
-          const serverSkus = new Set(currentStocks.map((s) => s.sku || s._id));
-          const missingLocals = cached.filter((c) => !serverSkus.has(c.sku || c._id));
-          if (missingLocals.length > 0) {
-            currentStocks = [...missingLocals, ...currentStocks];
-          }
-        }
-        if (currentStocks.length > 0) {
-          localStorage.setItem('lufo_crm_cached_stocks', JSON.stringify(currentStocks));
-        }
-      } catch (e) {}
-
+      const currentStocks = res.success ? res.data : [];
+      localStorage.setItem('lufo_crm_cached_stocks', JSON.stringify(currentStocks));
       setStocks(currentStocks);
     } catch (err) {
       try {

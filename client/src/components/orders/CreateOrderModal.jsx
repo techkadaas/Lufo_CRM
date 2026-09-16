@@ -150,11 +150,13 @@ export const CreateOrderModal = ({ isOpen, onClose }) => {
       },
     ]);
   };
+  const addItemRow = handleAddItem;
 
   const handleRemoveItem = (index) => {
     if (items.length <= 1) return;
     setItems(items.filter((_, idx) => idx !== index));
   };
+  const removeItemRow = handleRemoveItem;
 
   const handleItemChange = (index, field, value) => {
     const updated = [...items];
@@ -188,6 +190,7 @@ export const CreateOrderModal = ({ isOpen, onClose }) => {
     };
     setItems(updated);
   };
+  const handleStockSelect = handleSelectStock;
 
   // Computations
   const subtotal = items.reduce((sum, item) => sum + (Number(item.total) || 0), 0);
@@ -206,6 +209,7 @@ export const CreateOrderModal = ({ isOpen, onClose }) => {
     }
     setStep(2);
   };
+  const handleProceedToStep2 = handleNextStep;
 
   const handleSubmitOrder = async (e) => {
     if (e) e.preventDefault();
@@ -272,6 +276,7 @@ export const CreateOrderModal = ({ isOpen, onClose }) => {
       setLoading(false);
     }
   };
+  const handleSubmit = handleSubmitOrder;
 
   return (
     <Modal
